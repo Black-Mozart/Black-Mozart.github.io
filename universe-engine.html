@@ -1,0 +1,1699 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Universe Engine — Interactive Physics Simulator</title>
+
+<!-- Fonts: Rajdhani (headings) + Source Serif 4 (body) + JetBrains Mono (code) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;1,8..60,300&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+
+<!-- KaTeX -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" crossorigin="anonymous">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" crossorigin="anonymous"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" crossorigin="anonymous" onload="katexReady=true; tryRenderMath();"></script>
+
+<style>
+/* ─────── RESET ─────── */
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --bg:       #030810;
+  --bg2:      #06101e;
+  --bg3:      #0a1828;
+  --bg4:      #0f2038;
+  --cyan:     #00d4ff;
+  --cyan-dim: rgba(0,212,255,0.12);
+  --amber:    #ffb84d;
+  --amber-dim:rgba(255,184,77,0.12);
+  --purple:   #a06aff;
+  --purple-dim:rgba(160,106,255,0.12);
+  --green:    #3affa0;
+  --green-dim:rgba(58,255,160,0.10);
+  --red:      #ff5566;
+  --text:     #c8d6e8;
+  --text-dim: #4e6278;
+  --text-mid: #8a9ab8;
+  --border:   rgba(0,212,255,0.14);
+  --nav-h:    52px;
+  --font-head:"Rajdhani", sans-serif;
+  --font-body:"Source Serif 4", serif;
+  --font-mono:"JetBrains Mono", monospace;
+}
+html,body{width:100%;height:100%;background:var(--bg);color:var(--text);overflow:hidden;font-family:var(--font-body);}
+
+/* ─────── NAV ─────── */
+#nav{
+  position:fixed;top:0;left:0;right:0;height:var(--nav-h);z-index:200;
+  background:rgba(3,8,16,0.92);
+  border-bottom:1px solid var(--border);
+  backdrop-filter:blur(12px);
+  display:flex;align-items:center;padding:0 20px;gap:0;
+}
+#nav .logo{
+  font-family:var(--font-head);font-size:18px;font-weight:700;
+  letter-spacing:3px;color:var(--cyan);text-transform:uppercase;
+  margin-right:auto; display:flex;align-items:center;gap:10px;
+}
+#nav .logo svg{width:22px;height:22px;}
+.tab-btns{display:flex;gap:2px;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:8px;padding:4px;}
+.tab-btn{
+  font-family:var(--font-head);font-size:13px;font-weight:600;letter-spacing:2px;
+  background:none;border:none;color:var(--text-dim);cursor:pointer;
+  padding:6px 18px;border-radius:5px;transition:all 0.2s;text-transform:uppercase;
+}
+.tab-btn:hover{color:var(--text);background:rgba(0,212,255,0.06);}
+.tab-btn.active{background:var(--cyan-dim);color:var(--cyan);border:1px solid rgba(0,212,255,0.3);}
+#nav .badge{
+  margin-left:auto;font-family:var(--font-mono);font-size:10px;
+  color:var(--text-dim);letter-spacing:1px;
+  background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.06);
+  padding:3px 8px;border-radius:4px;
+}
+
+/* ─────── TAB PANELS ─────── */
+.tab-panel{
+  position:fixed;top:var(--nav-h);left:0;right:0;
+  bottom:0;display:none;
+}
+.tab-panel.active{display:block;}
+
+/* ─────── SIMULATE TAB ─────── */
+#tab-simulate{background:var(--bg);}
+#sim-canvas{display:block;width:100%;height:100%;}
+#sim-ui{
+  position:absolute;top:0;left:0;width:100%;height:100%;
+  pointer-events:none;font-family:var(--font-mono);
+}
+#sim-hud{
+  position:absolute;top:0;left:0;
+  background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);
+  padding:10px 14px 8px;border-bottom-right-radius:8px;
+  max-width:calc(100% - 150px);
+  border-right:1px solid var(--border);border-bottom:1px solid var(--border);
+}
+#sim-hud h2{color:var(--cyan);font-family:var(--font-head);font-size:16px;letter-spacing:3px;margin-bottom:5px;}
+#sim-hud .ctrl{color:var(--text-mid);font-size:10px;line-height:1.9;}
+#sim-status{
+  position:absolute;top:102px;left:0;
+  background:rgba(0,0,0,0.5);color:var(--text);
+  font-size:10px;padding:4px 12px;
+  border-bottom-right-radius:5px;
+  border-right:1px solid var(--border);border-bottom:1px solid var(--border);
+}
+#sim-fps{
+  position:absolute;top:8px;right:148px;
+  background:rgba(0,0,0,0.6);
+  font-size:18px;font-weight:600;
+  padding:4px 10px;border-radius:4px;
+  letter-spacing:1px;border:1px solid rgba(255,255,255,0.06);
+}
+#paused-banner{
+  position:absolute;top:8px;left:50%;transform:translateX(-50%);
+  background:rgba(0,0,0,0.7);color:var(--red);
+  font-size:20px;font-weight:600;font-family:var(--font-head);letter-spacing:4px;
+  padding:6px 24px;border-radius:4px;display:none;
+  border:1px solid rgba(255,85,102,0.4);
+}
+#sim-info-panel{
+  position:absolute;bottom:14px;left:10px;
+  background:rgba(3,8,16,0.85);backdrop-filter:blur(8px);
+  border:1px solid rgba(255,184,77,0.4);
+  border-radius:8px;padding:10px 14px;color:var(--text);min-width:260px;display:none;
+}
+#sim-info-panel .lock-lbl{color:var(--amber);font-size:11px;margin-bottom:2px;letter-spacing:2px;}
+#sim-info-panel .body-type{font-family:var(--font-head);font-size:18px;letter-spacing:2px;margin-bottom:6px;}
+#sim-info-panel .stat{color:var(--text-mid);font-size:11px;line-height:2;}
+#sim-no-follow{position:absolute;bottom:12px;left:14px;color:var(--text-dim);font-size:11px;}
+#sim-toolbar{
+  position:absolute;top:0;right:0;width:130px;height:100%;
+  background:rgba(3,8,16,0.9);border-left:1px solid var(--border);
+  pointer-events:all;display:flex;flex-direction:column;
+}
+.tb-btn{
+  flex:0 0 68px;cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  border-bottom:1px solid rgba(30,40,60,0.8);position:relative;user-select:none;
+  transition:background 0.15s;
+}
+.tb-btn:hover{background:rgba(0,212,255,0.04);}
+.tb-btn.sel{background:rgba(0,212,255,0.07);}
+.tb-sel-bar{position:absolute;left:0;top:0;width:3px;height:100%;display:none;}
+.tb-btn.sel .tb-sel-bar{display:block;}
+.tb-icon{width:26px;height:26px;border-radius:50%;margin-bottom:4px;display:flex;align-items:center;justify-content:center;font-family:var(--font-head);font-size:11px;font-weight:700;color:#000;}
+.tb-label{font-family:var(--font-head);font-size:9px;letter-spacing:2px;color:var(--text-dim);}
+.tb-btn.sel .tb-label{color:var(--text);}
+.tb-hint{font-size:9px;color:rgba(80,100,130,0.7);margin-top:2px;font-family:var(--font-mono);}
+#ctx-menu{
+  position:absolute;background:rgba(6,14,28,0.97);
+  border:1px solid rgba(80,100,160,0.7);border-radius:6px;
+  padding:6px;min-width:160px;display:none;z-index:100;
+  pointer-events:all;backdrop-filter:blur(12px);
+}
+.ctx-title{color:var(--text-dim);font-size:10px;letter-spacing:2px;padding:2px 4px 6px;font-family:var(--font-head);}
+.ctx-item{
+  display:flex;align-items:center;gap:8px;
+  padding:6px 8px;border-radius:4px;cursor:pointer;
+  color:var(--text);font-size:12px;font-family:var(--font-head);letter-spacing:1px;
+  transition:background 0.1s;
+}
+.ctx-item:hover{background:rgba(0,212,255,0.08);}
+.ctx-dot{width:14px;height:14px;border-radius:50%;flex-shrink:0;}
+.ctx-key{margin-left:auto;color:var(--text-dim);font-size:10px;font-family:var(--font-mono);}
+#flash-overlay{position:absolute;inset:0;background:rgba(255,240,200,0);pointer-events:none;transition:none;}
+
+/* ─────── LEARN TAB ─────── */
+#tab-learn{
+  overflow-y:auto;background:var(--bg);
+  scrollbar-width:thin;scrollbar-color:var(--bg4) transparent;
+}
+#tab-learn::-webkit-scrollbar{width:6px;}
+#tab-learn::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:3px;}
+
+.learn-hero{
+  text-align:center;padding:64px 20px 48px;
+  background:radial-gradient(ellipse at 50% 0%, rgba(0,212,255,0.06) 0%, transparent 70%);
+  border-bottom:1px solid var(--border);
+}
+.learn-hero h1{
+  font-family:var(--font-head);font-size:clamp(32px,5vw,52px);font-weight:700;
+  letter-spacing:6px;color:var(--text);text-transform:uppercase;
+  margin-bottom:10px;
+}
+.learn-hero h1 span{color:var(--cyan);}
+.learn-hero p{
+  font-size:18px;font-weight:300;color:var(--text-mid);max-width:640px;
+  margin:0 auto;line-height:1.7;
+}
+.learn-hero .engine-tags{
+  margin-top:20px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;
+}
+.eng-tag{
+  font-family:var(--font-mono);font-size:11px;
+  padding:4px 12px;border-radius:20px;
+  background:rgba(0,0,0,0.5);border:1px solid var(--border);
+  color:var(--cyan);letter-spacing:1px;
+}
+
+.learn-body{max-width:900px;margin:0 auto;padding:0 20px 80px;}
+
+.phys-card{
+  margin:36px 0;border:1px solid rgba(255,255,255,0.06);
+  border-radius:10px;overflow:hidden;
+  background:linear-gradient(160deg,rgba(10,20,40,0.9),rgba(6,12,24,0.95));
+}
+.phys-card-head{
+  display:flex;align-items:center;gap:16px;
+  padding:18px 24px;border-bottom:1px solid rgba(255,255,255,0.06);
+  position:relative;overflow:hidden;
+}
+.phys-card-head::before{
+  content:'';position:absolute;left:0;top:0;width:4px;height:100%;
+}
+.phys-card.c-cyan .phys-card-head::before{background:var(--cyan);}
+.phys-card.c-amber .phys-card-head::before{background:var(--amber);}
+.phys-card.c-purple .phys-card-head::before{background:var(--purple);}
+.phys-card.c-green .phys-card-head::before{background:var(--green);}
+.phys-card.c-red .phys-card-head::before{background:var(--red);}
+
+.card-num{
+  font-family:var(--font-mono);font-size:11px;
+  color:var(--text-dim);letter-spacing:1px;
+  background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.06);
+  padding:3px 8px;border-radius:4px;white-space:nowrap;
+}
+.phys-card-head h2{
+  font-family:var(--font-head);font-size:20px;font-weight:600;
+  letter-spacing:2px;color:var(--text);text-transform:uppercase;flex:1;
+}
+.badge{
+  font-family:var(--font-mono);font-size:10px;
+  padding:3px 10px;border-radius:20px;white-space:nowrap;
+}
+.badge-cyan{background:var(--cyan-dim);color:var(--cyan);border:1px solid rgba(0,212,255,0.25);}
+.badge-amber{background:var(--amber-dim);color:var(--amber);border:1px solid rgba(255,184,77,0.25);}
+.badge-purple{background:var(--purple-dim);color:var(--purple);border:1px solid rgba(160,106,255,0.25);}
+.badge-red{background:rgba(255,85,102,0.1);color:var(--red);border:1px solid rgba(255,85,102,0.25);}
+
+.phys-card-body{padding:24px;}
+.phys-card-body p{font-size:16px;font-weight:300;line-height:1.75;color:var(--text-mid);margin-bottom:16px;}
+.phys-card-body p strong{color:var(--text);font-weight:600;}
+.phys-card-body p em{color:var(--cyan);font-style:normal;}
+
+.eq-block{
+  margin:20px 0;padding:16px 20px;
+  background:rgba(0,0,0,0.5);border-radius:6px;
+  border-left:2px solid rgba(0,212,255,0.3);
+}
+.eq-label{
+  font-family:var(--font-mono);font-size:10px;letter-spacing:2px;
+  color:var(--text-dim);text-transform:uppercase;margin-bottom:12px;
+}
+.eq-block .katex-display{margin:0!important;}
+.eq-block .katex{color:var(--text)!important;}
+
+.note-box{
+  display:flex;gap:12px;align-items:flex-start;
+  background:rgba(0,0,0,0.3);border-radius:6px;
+  padding:12px 16px;margin:16px 0;
+  border:1px solid rgba(255,255,255,0.05);
+}
+.note-box.nb-cyan{border-left:2px solid var(--cyan);background:var(--cyan-dim);}
+.note-box.nb-amber{border-left:2px solid var(--amber);background:var(--amber-dim);}
+.note-box.nb-purple{border-left:2px solid var(--purple);background:var(--purple-dim);}
+.note-ico{font-size:16px;margin-top:1px;flex-shrink:0;}
+.note-box p{font-size:13px;line-height:1.6;color:var(--text);margin:0;}
+.note-box p code{font-family:var(--font-mono);font-size:11px;background:rgba(0,0,0,0.4);padding:1px 5px;border-radius:3px;color:var(--cyan);}
+
+/* Mini demo canvases */
+.demo-wrap{
+  margin:20px 0;border:1px solid var(--border);border-radius:8px;overflow:hidden;
+  background:rgba(0,0,0,0.6);
+}
+.demo-label{
+  font-family:var(--font-head);font-size:11px;letter-spacing:2px;
+  color:var(--text-dim);padding:8px 14px;
+  border-bottom:1px solid var(--border);
+  background:rgba(0,0,0,0.4);text-transform:uppercase;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.demo-label span{color:var(--cyan);font-family:var(--font-mono);font-size:10px;}
+.demo-canvases{display:flex;gap:0;}
+.demo-canvases canvas{flex:1;display:block;}
+.demo-caption{
+  font-family:var(--font-mono);font-size:10px;
+  color:var(--text-dim);padding:8px 14px;
+  border-top:1px solid var(--border);
+  background:rgba(0,0,0,0.3);
+}
+
+/* Two-column layout for side-by-side demos */
+.two-col{display:flex;gap:0;}
+.two-col>div{flex:1;text-align:center;padding:8px;}
+.two-col>div:first-child{border-right:1px solid var(--border);}
+.col-title{font-family:var(--font-mono);font-size:10px;color:var(--text-mid);margin-bottom:4px;letter-spacing:1px;}
+.col-energy{font-family:var(--font-mono);font-size:12px;margin-top:4px;}
+
+/* ─────── CODE TAB ─────── */
+#tab-code{overflow-y:auto;background:var(--bg);scrollbar-width:thin;scrollbar-color:var(--bg4) transparent;}
+#tab-code::-webkit-scrollbar{width:6px;}
+#tab-code::-webkit-scrollbar-thumb{background:var(--bg4);}
+
+.code-section{max-width:900px;margin:0 auto;padding:0 20px 80px;}
+.code-hero{
+  text-align:center;padding:56px 20px 40px;
+  background:radial-gradient(ellipse at 50% 0%, rgba(160,106,255,0.06) 0%,transparent 70%);
+  border-bottom:1px solid var(--border);margin-bottom:40px;
+}
+.code-hero h1{
+  font-family:var(--font-head);font-size:clamp(28px,4vw,44px);font-weight:700;
+  letter-spacing:5px;text-transform:uppercase;color:var(--text);margin-bottom:10px;
+}
+.code-hero h1 span{color:var(--purple);}
+.code-hero p{font-size:16px;font-weight:300;color:var(--text-mid);max-width:560px;margin:0 auto;line-height:1.7;}
+
+.algo-block{margin:28px 0;}
+.algo-title{
+  font-family:var(--font-head);font-size:16px;letter-spacing:2px;
+  color:var(--text);text-transform:uppercase;
+  display:flex;align-items:center;gap:12px;margin-bottom:12px;
+}
+.algo-title .alabel{
+  font-family:var(--font-mono);font-size:10px;
+  background:var(--purple-dim);color:var(--purple);
+  border:1px solid rgba(160,106,255,0.3);
+  padding:3px 10px;border-radius:20px;letter-spacing:1px;
+}
+pre{
+  background:rgba(0,0,0,0.7);border:1px solid rgba(255,255,255,0.07);
+  border-radius:8px;padding:20px;
+  font-family:var(--font-mono);font-size:12px;line-height:1.8;
+  color:var(--text-mid);overflow-x:auto;
+  scrollbar-width:thin;
+}
+.kw{color:var(--cyan);}
+.fn{color:var(--amber);}
+.cm{color:var(--text-dim);font-style:italic;}
+.num{color:var(--green);}
+.op{color:var(--purple);}
+.str{color:var(--red);}
+
+.complexity-table-wrap{margin:28px 0;overflow-x:auto;}
+table{
+  width:100%;border-collapse:collapse;
+  font-family:var(--font-mono);font-size:12px;
+}
+th{
+  background:rgba(0,212,255,0.08);color:var(--cyan);
+  font-weight:600;letter-spacing:2px;text-transform:uppercase;
+  padding:10px 16px;text-align:left;
+  border-bottom:2px solid rgba(0,212,255,0.2);
+}
+td{
+  padding:10px 16px;border-bottom:1px solid rgba(255,255,255,0.04);
+  color:var(--text-mid);
+}
+tr:hover td{background:rgba(0,212,255,0.03);}
+td:first-child{color:var(--text);}
+td.tc-good{color:var(--green);}
+td.tc-ok{color:var(--amber);}
+td.tc-bad{color:var(--red);}
+
+.wasm-card{
+  margin:28px 0;padding:24px;
+  background:linear-gradient(135deg,rgba(10,8,30,0.95),rgba(6,10,22,0.98));
+  border:1px solid rgba(160,106,255,0.3);border-radius:10px;
+  position:relative;overflow:hidden;
+}
+.wasm-card::before{
+  content:'';position:absolute;top:0;right:0;
+  width:200px;height:200px;
+  background:radial-gradient(ellipse,rgba(160,106,255,0.08),transparent 70%);
+}
+.wasm-card h3{
+  font-family:var(--font-head);font-size:18px;letter-spacing:2px;
+  color:var(--purple);text-transform:uppercase;margin-bottom:12px;
+}
+.wasm-card p{font-size:15px;font-weight:300;color:var(--text-mid);line-height:1.75;margin-bottom:12px;}
+.wasm-card ul{list-style:none;display:flex;flex-direction:column;gap:8px;}
+.wasm-card li{
+  font-size:13px;color:var(--text-mid);
+  display:flex;align-items:flex-start;gap:10px;line-height:1.6;
+}
+.wasm-card li::before{content:'→';color:var(--purple);flex-shrink:0;margin-top:1px;}
+
+/* KaTeX overrides */
+.katex{font-size:1.1em!important;}
+.katex-display{overflow-x:auto;overflow-y:hidden;padding:4px 0;}
+
+/* Divider */
+.divider{
+  height:1px;background:linear-gradient(90deg,transparent,var(--border),transparent);
+  margin:32px 0;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:6px;}
+::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:3px;}
+::-webkit-scrollbar-track{background:transparent;}
+</style>
+</head>
+<body>
+
+<!-- ─────────────────── NAV ─────────────────── -->
+<nav id="nav">
+  <div class="logo">
+    <svg viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="11" cy="11" r="3" fill="#00d4ff"/>
+      <circle cx="11" cy="11" r="8" stroke="#00d4ff" stroke-width="1" fill="none" stroke-dasharray="3 2"/>
+      <circle cx="11" cy="3.5" r="1.5" fill="#ffb84d"/>
+      <circle cx="18.5" cy="14" r="1.2" fill="#a06aff"/>
+    </svg>
+    Universe Engine
+  </div>
+  <div class="tab-btns" style="margin:0 auto;">
+    <button class="tab-btn active" onclick="switchTab('simulate')">⚡ Simulate</button>
+    <button class="tab-btn" onclick="switchTab('learn')">∑ Learn</button>
+    <button class="tab-btn" onclick="switchTab('code')">&lt;/&gt; Code</button>
+  </div>
+  <div class="badge">v3.0 · Barnes-Hut · Verlet</div>
+</nav>
+
+<!-- ═══════════════ TAB: SIMULATE ═══════════════ -->
+<div id="tab-simulate" class="tab-panel active">
+  <canvas id="sim-canvas"></canvas>
+  <div id="sim-ui">
+    <div id="sim-hud">
+      <h2>UNIVERSE SANDBOX</h2>
+      <div class="ctrl">LMB drag: spawn &nbsp;·&nbsp; LMB click: follow &nbsp;·&nbsp; RMB drag: pan &nbsp;·&nbsp; RMB click: spawn menu</div>
+      <div class="ctrl">WASD/↑↓←→: fly &nbsp;·&nbsp; F: free cam &nbsp;·&nbsp; SPACE: pause &nbsp;·&nbsp; T: trails &nbsp;·&nbsp; G: glow &nbsp;·&nbsp; B: bloom</div>
+      <div class="ctrl">1/P: Planet &nbsp;·&nbsp; 2/S: Star &nbsp;·&nbsp; 3/H: Black Hole &nbsp;·&nbsp; 4: Random &nbsp;·&nbsp; C: clear &nbsp;·&nbsp; R: reset &nbsp;·&nbsp; N/M: supernova</div>
+    </div>
+    <div id="sim-status">Bodies: 0 | Physics: 0 | BH nodes: 0 | Zoom: 1.00x | Bloom: ON</div>
+    <div id="sim-fps">60 FPS</div>
+    <div id="paused-banner">PAUSED</div>
+    <div id="sim-info-panel">
+      <div class="lock-lbl">[ LOCKED ON ]</div>
+      <div class="body-type" id="ip-type">PLANET</div>
+      <div class="stat" id="ip-stats"></div>
+    </div>
+    <div id="sim-no-follow">Click a body to follow it &nbsp;·&nbsp; F = free camera</div>
+    <div id="sim-toolbar"></div>
+    <div id="ctx-menu"></div>
+    <div id="flash-overlay"></div>
+  </div>
+</div>
+
+<!-- ═══════════════ TAB: LEARN ═══════════════ -->
+<div id="tab-learn" class="tab-panel">
+  <div class="learn-hero">
+    <h1>Physics <span>Engine</span> Docs</h1>
+    <p>Every equation, algorithm, and design decision powering the simulation — from Newton's law to O(N log N) approximations.</p>
+    <div class="engine-tags">
+      <span class="eng-tag">N-Body Gravity</span>
+      <span class="eng-tag">Barnes-Hut O(N log N)</span>
+      <span class="eng-tag">Velocity Verlet</span>
+      <span class="eng-tag">Softened Potential</span>
+      <span class="eng-tag">Collision Fragmentation</span>
+      <span class="eng-tag">Shockwave Physics</span>
+    </div>
+  </div>
+  <div class="learn-body">
+
+    <!-- CARD 1 -->
+    <div class="phys-card c-cyan">
+      <div class="phys-card-head">
+        <span class="card-num">§ 01</span>
+        <h2>The N-Body Gravitational Problem</h2>
+        <span class="badge badge-cyan">Foundation</span>
+      </div>
+      <div class="phys-card-body">
+        <p>The core challenge: simulating a universe means computing the gravitational force between <strong>every pair of bodies</strong> at every timestep. With $N$ bodies that's $\tfrac{N(N-1)}{2}$ force evaluations — an <em>O(N²)</em> problem. At N=5000, that's ~12.5 million calculations per frame.</p>
+        <div class="eq-block">
+          <div class="eq-label">Newton's Law of Universal Gravitation</div>
+          $$F = G \frac{m_1 \, m_2}{r^2}$$
+        </div>
+        <div class="eq-block">
+          <div class="eq-label">Full N-body gravitational acceleration on body i</div>
+          $$\vec{a}_i = G \sum_{\substack{j=1 \\ j \neq i}}^{N} \frac{m_j \,(\vec{r}_j - \vec{r}_i)}{|\vec{r}_j - \vec{r}_i|^3}$$
+        </div>
+        <div class="note-box nb-amber">
+          <span class="note-ico">⚡</span>
+          <p>At N=5000 bodies, brute-force N-body requires ~25 million force pair evaluations per second at 60 FPS — far too slow. The Barnes-Hut tree reduces this to ~O(N log N), roughly 300k operations for the same N.</p>
+        </div>
+        <p>The gravitational constant $G$ in this engine is <em>500 px³ · s⁻² · mass⁻¹</em> — tuned to produce visually interesting orbital timescales at screen-space distances.</p>
+      </div>
+    </div>
+
+    <!-- CARD 2 -->
+    <div class="phys-card c-cyan">
+      <div class="phys-card-head">
+        <span class="card-num">§ 02</span>
+        <h2>Barnes-Hut Quadtree Algorithm</h2>
+        <span class="badge badge-cyan">O(N log N)</span>
+      </div>
+      <div class="phys-card-body">
+        <p>The key insight: <strong>a group of distant stars can be approximated as a single point mass at their centre of mass.</strong> Barnes-Hut recursively divides 2D space into a quadtree. When computing force on a body, if a node is <em>sufficiently far away</em>, use the aggregate mass — otherwise recurse into its children.</p>
+        <div class="eq-block">
+          <div class="eq-label">Opening angle criterion (θ — Barnes-Hut condition)</div>
+          $$\frac{s}{d} < \theta$$
+          <br>
+          <div class="eq-label" style="margin-top:8px">where $s$ = cell width, $d$ = distance to cell's centre of mass</div>
+        </div>
+        <div class="eq-block">
+          <div class="eq-label">Centre of mass (incremental update as bodies are inserted)</div>
+          $$\vec{r}_{cm} = \frac{\displaystyle\sum_{i} m_i \, \vec{r}_i}{\displaystyle\sum_{i} m_i}$$
+        </div>
+        <div class="demo-wrap" id="bh-demo-wrap">
+          <div class="demo-label">
+            Live Quadtree Visualizer — Barnes-Hut cell subdivisions
+            <span id="bh-demo-info">hover a body to see θ criterion</span>
+          </div>
+          <canvas id="bh-canvas" width="860" height="280" style="width:100%;display:block;cursor:crosshair;"></canvas>
+          <div class="demo-caption">Click canvas to add bodies · Cells shown in cyan (used for approximation), dimmer cells subdivided further · θ = 0.85</div>
+        </div>
+        <div class="note-box nb-cyan">
+          <span class="note-ico">🌲</span>
+          <p>This engine uses <code>θ = 0.85</code> — a good balance between accuracy and speed. Lower θ (e.g. 0.5) = more accurate but slower. Higher θ = faster but less accurate. At θ=1.5 orbits become noticeably wrong; at θ=0.3 it approaches O(N²) again.</p>
+        </div>
+        <p>The tree is <strong>rebuilt from scratch every physics substep</strong> because bodies move each step. Build time is O(N log N); each query walk is O(log N) average.</p>
+      </div>
+    </div>
+
+    <!-- CARD 3 -->
+    <div class="phys-card c-amber">
+      <div class="phys-card-head">
+        <span class="card-num">§ 03</span>
+        <h2>Gravitational Softening</h2>
+        <span class="badge badge-amber">Stability</span>
+      </div>
+      <div class="phys-card-body">
+        <p>When two bodies come very close, $r \to 0$ makes the gravitational force blow up to infinity, causing wild velocity spikes and numerical explosion. We add a <strong>softening parameter ε</strong> to regularise the potential at short range.</p>
+        <div class="eq-block">
+          <div class="eq-label">Standard (singular at r=0)</div>
+          $$\vec{a}_i = G \sum_{j \neq i} \frac{m_j \,(\vec{r}_j - \vec{r}_i)}{|\vec{r}_j - \vec{r}_i|^3}$$
+        </div>
+        <div class="eq-block">
+          <div class="eq-label">Softened (Plummer softening — stable for all r)</div>
+          $$\vec{a}_i = G \sum_{j \neq i} \frac{m_j \,(\vec{r}_j - \vec{r}_i)}{\left(|\vec{r}_j - \vec{r}_i|^2 + \varepsilon^2\right)^{3/2}}$$
+        </div>
+        <div class="note-box nb-amber">
+          <span class="note-ico">📐</span>
+          <p>This engine uses <code>ε = 6 px</code>. Softening also enters the BH tree query as <code>dist² = dx²+dy² + ε²</code>. Physically, it smooths out the potential as if bodies had a finite size rather than being point masses — which they effectively are anyway, given their rendered radii.</p>
+        </div>
+        <p>The Plummer softening kernel corresponds to the gravitational potential of a <em>Plummer sphere</em>: $\Phi(r) = -\frac{Gm}{\sqrt{r^2 + \varepsilon^2}}$, which approaches the Newtonian $-Gm/r$ for $r \gg \varepsilon$.</p>
+      </div>
+    </div>
+
+    <!-- CARD 4 -->
+    <div class="phys-card c-cyan">
+      <div class="phys-card-head">
+        <span class="card-num">§ 04</span>
+        <h2>Velocity Verlet Integration</h2>
+        <span class="badge badge-cyan">2nd-Order Symplectic</span>
+      </div>
+      <div class="phys-card-body">
+        <p>How do we advance positions and velocities forward in time? <strong>Simple Euler integration</strong> ($\vec{r} \mathrel{+}= \vec{v} \cdot h$) is first-order and dissipates energy — orbits <em>slowly spiral inward or outward</em>. <strong>Velocity Verlet</strong> uses the average of current and next accelerations, making it time-reversible and energy-conserving (symplectic).</p>
+        <div class="eq-block">
+          <div class="eq-label">Step 1 — Update positions using current velocity + old acceleration</div>
+          $$\vec{r}(t+h) = \vec{r}(t) + \vec{v}(t)\cdot h + \tfrac{1}{2}\,\vec{a}(t)\cdot h^2$$
+        </div>
+        <div class="eq-block">
+          <div class="eq-label">Step 2 — Rebuild BH tree, compute new accelerations at updated positions</div>
+          $$\vec{a}(t+h) = \sum_j \text{BH-Force}\!\left(\vec{r}(t+h)\right)$$
+        </div>
+        <div class="eq-block">
+          <div class="eq-label">Step 3 — Update velocities using average of old + new acceleration</div>
+          $$\vec{v}(t+h) = \vec{v}(t) + \tfrac{1}{2}\left[\vec{a}(t) + \vec{a}(t+h)\right] h$$
+        </div>
+        <div class="demo-wrap">
+          <div class="demo-label">
+            Euler vs Velocity Verlet — orbit energy stability
+            <span id="verlet-timer">live</span>
+          </div>
+          <div class="two-col">
+            <div>
+              <div class="col-title">Euler (1st order) — energy DRIFTS</div>
+              <canvas id="euler-canvas" width="400" height="200" style="width:100%;display:block;background:#020608;"></canvas>
+              <div class="col-energy" id="euler-energy" style="color:#ff5566;">ΔE = 0.00%</div>
+            </div>
+            <div>
+              <div class="col-title">Velocity Verlet (2nd order) — energy CONSERVED</div>
+              <canvas id="verlet-canvas" width="400" height="200" style="width:100%;display:block;background:#020608;"></canvas>
+              <div class="col-energy" id="verlet-energy" style="color:#3affa0;">ΔE = 0.00%</div>
+            </div>
+          </div>
+          <div class="demo-caption">Both simulations: same initial conditions (circular orbit). Euler orbit drifts inward/outward; Verlet maintains orbit indefinitely. Trails show ~5s of history.</div>
+        </div>
+        <div class="note-box nb-cyan">
+          <span class="note-ico">🔁</span>
+          <p>Velocity Verlet is <strong>time-reversible</strong>: if you negate all velocities, the simulation runs backward exactly. This means no net energy injection or dissipation. The simulation runs <code>2 substeps per frame</code> (each substep = dt/2) for additional accuracy.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- CARD 5 -->
+    <div class="phys-card c-amber">
+      <div class="phys-card-head">
+        <span class="card-num">§ 05</span>
+        <h2>Collision Resolution & Fragmentation</h2>
+        <span class="badge badge-amber">O(N²) detection</span>
+      </div>
+      <div class="phys-card-body">
+        <p>Each pair of non-particle bodies is checked for overlap every physics substep. On overlap, the outcome depends on the relative speed: <strong>slow collisions merge</strong> (momentum conserved), <strong>high-energy impacts shatter</strong> both bodies into fragments.</p>
+        <div class="eq-block">
+          <div class="eq-label">Overlap detection — collision when</div>
+          $$|\vec{r}_i - \vec{r}_j| < r_i + r_j$$
+        </div>
+        <div class="eq-block">
+          <div class="eq-label">Momentum-conserving merge velocity</div>
+          $$\vec{v}_{cm} = \frac{m_1 \vec{v}_1 + m_2 \vec{v}_2}{m_1 + m_2}$$
+        </div>
+        <div class="eq-block">
+          <div class="eq-label">Fragmentation condition (both bodies must be large enough)</div>
+          $$|\vec{v}_1 - \vec{v}_2| \geq v_{\text{thresh}} \quad \text{and} \quad m_1, m_2 \geq m_{\min}$$
+          <br>
+          <div class="eq-label" style="margin-top:6px">Engine values: $v_{\text{thresh}} = 420\text{ px/s}$, $m_{\min} = 18$</div>
+        </div>
+        <div class="eq-block">
+          <div class="eq-label">Fragment mass allocation (3–5 fragments)</div>
+          $$m_f = \frac{m_1 + m_2}{N_{\text{frags}}}, \qquad N_{\text{frags}} \in \{3, 4, 5\}$$
+        </div>
+        <div class="note-box nb-amber">
+          <span class="note-ico">💥</span>
+          <p>Fragment velocities use alternating kick signs to ensure <strong>momentum is approximately conserved</strong> across the fragment cloud: odd-indexed fragments get <code>+kick</code>, even get <code>-kick</code>, so the net delta-momentum sums near zero around the centre-of-mass velocity.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- CARD 6 -->
+    <div class="phys-card c-green">
+      <div class="phys-card-head">
+        <span class="card-num">§ 06</span>
+        <h2>Shockwave Propagation</h2>
+        <span class="badge" style="background:var(--green-dim);color:var(--green);border:1px solid rgba(58,255,160,0.25);">Radial Impulse</span>
+      </div>
+      <div class="phys-card-body">
+        <p>Supernovae emit an expanding shockwave ring that transfers impulse to any body caught in its wavefront. The wave expands radially at constant speed, decays in strength, and vanishes when it reaches its maximum radius.</p>
+        <div class="eq-block">
+          <div class="eq-label">Wave front radius over time</div>
+          $$R(t) = R_0 + v_{\text{shock}} \cdot t, \qquad v_{\text{shock}} = 700 \text{ px/s}$$
+        </div>
+        <div class="eq-block">
+          <div class="eq-label">Radial falloff function</div>
+          $$f(R) = \text{clamp}\!\left(1 - \frac{R}{R_{\max}},\; 0,\; 1\right)$$
+        </div>
+        <div class="eq-block">
+          <div class="eq-label">Impulse applied when body i is within wavefront thickness $w$</div>
+          $$\Delta\vec{v}_i = \frac{S \cdot f(R)}{m_i + \delta}\;\hat{n}_i \qquad \text{when } |R - d_i| < w$$
+          <br>
+          <div class="eq-label" style="margin-top:6px">where $S$ = wave strength, $\hat{n}_i$ = outward unit vector, $w$ = 14 px, $\delta$ = 5</div>
+        </div>
+        <p>The $m_i + \delta$ denominator ensures lighter bodies get a stronger kick (impulse = force × time, so lighter bodies accelerate more), while the $\delta$ prevents division by zero for near-zero mass particles.</p>
+      </div>
+    </div>
+
+    <!-- CARD 7 -->
+    <div class="phys-card c-purple">
+      <div class="phys-card-head">
+        <span class="card-num">§ 07</span>
+        <h2>Black Hole Mechanics</h2>
+        <span class="badge badge-purple">Extreme Gravity</span>
+      </div>
+      <div class="phys-card-body">
+        <p>Black holes use <strong>supplemental accretion gravity</strong> on top of the BH tree force — a stronger, direct-sum force applied to every nearby body. Bodies that cross the event horizon are consumed.</p>
+        <div class="eq-block">
+          <div class="eq-label">Accretion pull (supplemental, applied every substep)</div>
+          $$\Delta\vec{v}_i = \frac{1200 \cdot M_{BH}}{d^2} \cdot \hat{d} \cdot \Delta t$$
+        </div>
+        <div class="eq-block">
+          <div class="eq-label">Event horizon — body consumed when</div>
+          $$d < r_{BH} + r_{\text{body}} + 3$$
+        </div>
+        <div class="eq-block">
+          <div class="eq-label">Schwarzschild-analogous radius</div>
+          $$r_{BH} = 12 + 0.003 \cdot M_{BH}$$
+        </div>
+        <div class="eq-block">
+          <div class="eq-label">Supernova remnant rules</div>
+          $$M_{\text{star}} > 3200 \Rightarrow \text{Black Hole},\quad M_{rem} = 0.7\,M_{\text{star}}$$
+          $$M_{\text{star}} \leq 3200 \Rightarrow \text{Neutron Star},\quad M_{rem} = 0.35\,M_{\text{star}}$$
+        </div>
+        <div class="note-box nb-purple">
+          <span class="note-ico">🌀</span>
+          <p>The bloom shader applies a <strong>gravitational lensing distortion</strong> near black holes: each black hole shifts UV coordinates toward itself with strength proportional to $M_{BH}/r^2$. This is a screen-space approximation — not ray-tracing — but creates a convincing visual warp in the bloom pass.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- CARD 8 -->
+    <div class="phys-card c-red">
+      <div class="phys-card-head">
+        <span class="card-num">§ 08</span>
+        <h2>System Performance Overview</h2>
+        <span class="badge badge-red">Complexity</span>
+      </div>
+      <div class="phys-card-body">
+        <p>Each frame runs <strong>2 physics substeps</strong> at $\Delta t / 2$ each. The dominant cost is the Barnes-Hut gravity kernel. Collision detection remains O(N²) — the next optimisation would be a sweep-and-prune broadphase.</p>
+        <div class="complexity-table-wrap">
+          <table>
+            <tr><th>Algorithm</th><th>Complexity</th><th>Per Frame (N=5000)</th><th>Note</th></tr>
+            <tr><td>BH Tree Build</td><td class="tc-good">O(N log N)</td><td>~62k ops</td><td>Rebuild each substep</td></tr>
+            <tr><td>BH Gravity Query</td><td class="tc-good">O(N log N)</td><td>~62k walks</td><td>θ=0.85 approximation</td></tr>
+            <tr><td>Collision Detection</td><td class="tc-bad">O(N²)</td><td>~12.5M pairs</td><td>Bottleneck above N=2000</td></tr>
+            <tr><td>Verlet Integration</td><td class="tc-good">O(N)</td><td>~5k updates</td><td>Memory-bandwidth bound</td></tr>
+            <tr><td>Shockwave Apply</td><td class="tc-ok">O(N·W)</td><td>~160k checks</td><td>W=32 max active waves</td></tr>
+            <tr><td>BH Pull (Black Holes)</td><td class="tc-ok">O(N·B)</td><td>~5k–50k</td><td>B = # black holes</td></tr>
+            <tr><td>Particle Cleanup</td><td class="tc-good">O(N)</td><td>~5k passes</td><td>Linear scan</td></tr>
+          </table>
+        </div>
+        <p>The 2-substep scheme at 60 FPS gives an effective physics rate of <em>120 Hz</em> with timestep $h = 1/120$ s, significantly improving stability for fast close encounters.</p>
+        <div class="note-box nb-cyan">
+          <span class="note-ico">🚀</span>
+          <p>Above N=3000 the JavaScript canvas renderer becomes the bottleneck — not the physics. At very high body counts, consider drawing particles as a WebGL point cloud. The physics itself is fast enough for N=10,000+ in JS; canvas <code>arc()</code> calls per body are what slow rendering down.</p>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /learn-body -->
+</div><!-- /tab-learn -->
+
+<!-- ═══════════════ TAB: CODE ═══════════════ -->
+<div id="tab-code" class="tab-panel">
+  <div class="code-hero">
+    <h1>Algorithm <span>Source</span></h1>
+    <p>Pseudocode, complexity notes, and implementation details for every major system in the engine.</p>
+  </div>
+  <div class="code-section">
+
+    <div class="algo-block">
+      <div class="algo-title">Barnes-Hut Tree Build + Query <span class="alabel">O(N log N)</span></div>
+<pre><span class="cm">// ── TREE BUILD ──────────────────────────────────────────────────────</span>
+<span class="kw">function</span> <span class="fn">buildTree</span>(bodies):
+  find bounding box of all non-particle bodies
+  allocate root node  <span class="cm">// covers bounding box, half-width = max(w,h)/2</span>
+
+  <span class="kw">for</span> each body b:
+    <span class="fn">insert</span>(root, b)
+
+<span class="kw">function</span> <span class="fn">insert</span>(node, b):
+  <span class="cm">// Incrementally update centre-of-mass</span>
+  newM       <span class="op">=</span> node.totalMass + b.mass
+  node.comX  <span class="op">=</span> (node.comX * node.totalMass + b.x * b.mass) / newM
+  node.comY  <span class="op">=</span> (node.comY * node.totalMass + b.y * b.mass) / newM
+  node.totalMass <span class="op">=</span> newM
+
+  <span class="kw">if</span> node is empty leaf:
+    node.body <span class="op">=</span> b                     <span class="cm">// become occupied leaf</span>
+    <span class="kw">return</span>
+
+  <span class="kw">if</span> node is occupied leaf:
+    push existing body into correct child quadrant
+    node.body <span class="op">=</span> null                  <span class="cm">// become internal node</span>
+
+  <span class="cm">// Insert b into correct quadrant</span>
+  q <span class="op">=</span> (b.x >= node.cx ? 1:0) + (b.y >= node.cy ? 2:0)  <span class="cm">// 0=NW 1=NE 2=SW 3=SE</span>
+  <span class="kw">if</span> node.children[q] == null:
+    allocate child with half-width <span class="op">=</span> node.half / 2
+  <span class="fn">insert</span>(node.children[q], b)
+
+<span class="cm">// ── FORCE QUERY (iterative BH walk) ────────────────────────────────</span>
+<span class="kw">function</span> <span class="fn">queryAccel</span>(px, py, queryIdx) -> vec2:
+  stack <span class="op">=</span> [root]
+  accel <span class="op">=</span> (0, 0)
+
+  <span class="kw">while</span> stack not empty:
+    node <span class="op">=</span> stack.pop()
+    <span class="kw">if</span> node.totalMass == 0: <span class="kw">continue</span>
+    <span class="kw">if</span> node.body == queryIdx: <span class="kw">continue</span>     <span class="cm">// skip self</span>
+
+    d <span class="op">=</span> distance(px,py, node.comX, node.comY)
+    s <span class="op">=</span> node.half * 2                       <span class="cm">// cell width</span>
+
+    <span class="kw">if</span> node.isLeaf OR (s / d) < θ:          <span class="cm">// Barnes-Hut criterion</span>
+      accel += G * node.totalMass / (d² + ε²) * unitVec
+    <span class="kw">else</span>:
+      stack.push(all non-null children)    <span class="cm">// recurse</span>
+
+  <span class="kw">return</span> accel</pre>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="algo-block">
+      <div class="algo-title">Velocity Verlet Integration <span class="alabel">O(N)</span></div>
+<pre><span class="cm">// ── VELOCITY VERLET (one substep) ──────────────────────────────────</span>
+<span class="kw">function</span> <span class="fn">verletStep</span>(dt):
+
+  <span class="cm">// Step 1: update positions using current velocity + half-step acceleration</span>
+  <span class="kw">for</span> each body i:
+    pos[i] <span class="op">+=</span> vel[i] <span class="op">*</span> dt <span class="op">+</span> <span class="num">0.5</span> <span class="op">*</span> acc[i] <span class="op">*</span> dt²
+
+  <span class="cm">// Step 2: rebuild BH tree at new positions, compute new accelerations</span>
+  <span class="fn">buildTree</span>(bodies)
+  <span class="kw">for</span> each body i:
+    newAcc[i] <span class="op">=</span> <span class="fn">queryAccel</span>(pos[i].x, pos[i].y, i)
+
+  <span class="cm">// Step 3: velocity update using AVERAGE of old + new acceleration</span>
+  <span class="kw">for</span> each body i:
+    vel[i] <span class="op">+=</span> <span class="num">0.5</span> <span class="op">*</span> (acc[i] <span class="op">+</span> newAcc[i]) <span class="op">*</span> dt
+    acc[i] <span class="op">=</span> newAcc[i]           <span class="cm">// store for next step</span>
+
+<span class="cm">// Compare with simple Euler (1st order, energy-dissipative):</span>
+<span class="kw">function</span> <span class="fn">eulerStep</span>(dt):
+  acc[i]  <span class="op">=</span> <span class="fn">queryAccel</span>(pos[i], i)
+  vel[i] <span class="op">+=</span> acc[i] <span class="op">*</span> dt          <span class="cm">// uses old positions — energy drifts</span>
+  pos[i] <span class="op">+=</span> vel[i] <span class="op">*</span> dt</pre>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="algo-block">
+      <div class="algo-title">Collision Resolution <span class="alabel">O(N²) detection</span></div>
+<pre><span class="cm">// ── COLLISION RESOLUTION ────────────────────────────────────────────</span>
+<span class="kw">function</span> <span class="fn">handleCollisions</span>():
+  <span class="kw">for</span> i = 0 to bodyCount:
+    <span class="kw">if</span> bodies[i].isParticle or isBlackHole: <span class="kw">continue</span>
+
+    <span class="kw">for</span> j = i+1 to bodyCount:
+      <span class="kw">if</span> bodies[j].isParticle or isBlackHole: <span class="kw">continue</span>
+
+      d <span class="op">=</span> distance(pos[i], pos[j])
+      <span class="kw">if</span> d >= radius[i] + radius[j]: <span class="kw">continue</span>    <span class="cm">// no overlap</span>
+
+      <span class="cm">// Centre-of-mass frame quantities</span>
+      M    <span class="op">=</span> mass[i] + mass[j]
+      vCM  <span class="op">=</span> (mass[i]*vel[i] + mass[j]*vel[j]) / M
+      pCM  <span class="op">=</span> (mass[i]*pos[i] + mass[j]*pos[j]) / M
+      vRel <span class="op">=</span> |vel[i] - vel[j]|
+
+      <span class="kw">if</span> vRel >= FRAG_THRESHOLD and mass[i],mass[j] >= FRAG_MIN:
+        <span class="cm">// ── FRAGMENTATION ──</span>
+        nFrags <span class="op">=</span> random(3, 5)
+        <span class="kw">for</span> f in 0..nFrags:
+          kick  <span class="op">=</span> random(80, vRel * 0.6)
+          sign  <span class="op">=</span> f % 2 == 0 ? +1 : -1      <span class="cm">// momentum balance</span>
+          spawn fragment at pCM with vel = vCM + spread * kick * sign
+        remove bodies[i], bodies[j]
+      <span class="kw">else</span>:
+        <span class="cm">// ── MERGE ──</span>
+        bodies[i].mass   <span class="op">=</span> M
+        bodies[i].vel    <span class="op">=</span> vCM
+        bodies[i].pos    <span class="op">=</span> pCM
+        bodies[i].radius <span class="op">=</span> 2.5 + M^0.35 * 0.6    <span class="cm">// mass-radius relation</span>
+        remove bodies[j]</pre>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="algo-block">
+      <div class="algo-title">Supernova Event <span class="alabel">Triggered</span></div>
+<pre><span class="cm">// ── SUPERNOVA ───────────────────────────────────────────────────────</span>
+<span class="kw">function</span> <span class="fn">supernova</span>(bodyIdx):
+  star <span class="op">=</span> bodies[bodyIdx]
+  remove star from simulation
+
+  <span class="cm">// Emit expanding shockwave</span>
+  <span class="fn">addShockwave</span>(star.pos, strength = <span class="num">1500</span> + star.mass * <span class="num">0.7</span>)
+
+  <span class="cm">// Spawn debris cloud</span>
+  debrisCount <span class="op">=</span> clamp(star.mass * 2.8, 300, 1200)
+  <span class="kw">for</span> i in 0..debrisCount:
+    <span class="fn">spawnParticle</span>(star.pos, speed=random(220,900), life=random(0.9,3))
+
+  <span class="cm">// Determine remnant</span>
+  <span class="kw">if</span> star.mass > <span class="num">3200</span>:
+    <span class="fn">spawnBlackHole</span>(mass = star.mass * <span class="num">0.7</span>)   <span class="cm">// massive → black hole</span>
+    <span class="fn">spawnAccretionDisk</span>(star.pos)
+  <span class="kw">else</span>:
+    <span class="fn">spawnNeutronStar</span>(mass = star.mass * <span class="num">0.35</span>)  <span class="cm">// smaller → neutron star</span></pre>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- WebAssembly Card -->
+    <div class="wasm-card">
+      <h3>⚙ Do We Need WebAssembly?</h3>
+      <p>Short answer: <strong>not at this scale.</strong> JavaScript with typed arrays (<code>Float32Array</code>, <code>Int32Array</code>) and an iterative (non-recursive) BH query runs the full engine at 60 FPS for up to ~5000 bodies in modern browsers.</p>
+      <p>WebAssembly (compiled from C/Rust) would become worthwhile when:</p>
+      <ul>
+        <li><strong>N &gt; 10,000 bodies</strong> — WASM BH tree traversal is ~5–10× faster than JS for tight numerical loops, primarily due to SIMD vectorisation and no GC pauses.</li>
+        <li><strong>Collision broadphase</strong> — a sweep-and-prune or BVH tree for O(N log N) collision detection in WASM would handle dense simulations JS can't.</li>
+        <li><strong>Multi-threading</strong> — WASM with SharedArrayBuffer and Web Workers can parallelise the BH force query across CPU cores (each body's query is independent).</li>
+        <li><strong>Emscripten port</strong> — the original C/raylib code could be compiled directly to WASM via Emscripten with minimal modification, running the GPU bloom shader via WebGL.</li>
+      </ul>
+      <p style="margin-top:12px;font-size:14px;color:var(--text-mid);">The current JS implementation uses typed arrays stored in contiguous memory (SoA layout), the iterative BH walk avoids call-stack overflow, and the physics runs in a single tight loop — about as fast as pure JS can get without WASM.</p>
+    </div>
+
+  </div><!-- /code-section -->
+</div><!-- /tab-code -->
+
+<!-- ═══════════════════════════════════════════════ -->
+<!--                  JAVASCRIPT                    -->
+<!-- ═══════════════════════════════════════════════ -->
+<script>
+'use strict';
+
+// ═══════════════ TAB SWITCHING ═══════════════
+let mathRendered = false;
+let katexReady = false;
+let bhDemoRunning = false;
+let verletDemoRunning = false;
+
+function tryRenderMath(){
+  if(katexReady && mathShown){
+    renderMathInElement(document.getElementById('tab-learn'),{
+      delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],
+      throwOnError:false
+    });
+    mathRendered = true;
+    startBHDemo();
+    startVerletDemo();
+  }
+}
+let mathShown = false;
+
+function switchTab(name){
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  document.querySelectorAll('.tab-btn').forEach(b=>{
+    if(b.textContent.toLowerCase().includes(name.slice(0,3))) b.classList.add('active');
+  });
+
+  if(name==='learn'){
+    mathShown = true;
+    if(katexReady && !mathRendered){
+      renderMathInElement(document.getElementById('tab-learn'),{
+        delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],
+        throwOnError:false
+      });
+      mathRendered = true;
+    }
+    if(!bhDemoRunning) startBHDemo();
+    if(!verletDemoRunning) startVerletDemo();
+  }
+}
+
+// ═══════════════ CONSTANTS ═══════════════
+const NAV_H = 52;
+const MAX_BODIES = 5000;
+const MAX_STARS  = 800;
+const MAX_WAVES  = 32;
+const BH_THETA   = 0.85;
+const FRAG_VEL   = 420;
+const FRAG_MASS  = 18;
+const G_SIM      = 500;
+const SOFT       = 6;
+const CLICK_THRESH = 8;
+const CAM_FRIC   = 0.88;
+const FLY_SPD    = 400;
+const FOLLOW_LAG = 0.08;
+
+const SPAWN_TYPES = [
+  {name:'PLANET',    cr:100,cg:180,cb:255},
+  {name:'STAR',      cr:255,cg:220,cb:80 },
+  {name:'BLACK HOLE',cr:160,cg:80, cb:255},
+  {name:'RANDOM',    cr:180,cg:180,cb:180},
+];
+
+// ═══════════════ SIMULATION CANVAS SETUP ═══════════════
+const simCanvas  = document.getElementById('sim-canvas');
+const simCtx     = simCanvas.getContext('2d');
+const offCanvas  = document.createElement('canvas');
+const offCtx     = offCanvas.getContext('2d');
+const trailCanvas= document.createElement('canvas');
+const trailCtx   = trailCanvas.getContext('2d');
+
+function resizeSim(){
+  const w = window.innerWidth, h = window.innerHeight - NAV_H;
+  simCanvas.width = offCanvas.width = trailCanvas.width = w;
+  simCanvas.height = offCanvas.height = trailCanvas.height = h;
+  simCanvas.style.width = w+'px';
+  simCanvas.style.height = h+'px';
+  trailCtx.fillStyle = 'rgb(3,8,16)';
+  trailCtx.fillRect(0,0,w,h);
+  cam.offX = w/2; cam.offY = h/2;
+}
+window.addEventListener('resize', resizeSim);
+
+// ═══════════════ TYPED ARRAYS ═══════════════
+const bPX=new Float32Array(MAX_BODIES), bPY=new Float32Array(MAX_BODIES);
+const bVX=new Float32Array(MAX_BODIES), bVY=new Float32Array(MAX_BODIES);
+const bAX=new Float32Array(MAX_BODIES), bAY=new Float32Array(MAX_BODIES);
+const bM =new Float32Array(MAX_BODIES), bR =new Float32Array(MAX_BODIES);
+const bLF=new Float32Array(MAX_BODIES), bML=new Float32Array(MAX_BODIES);
+const bT =new Uint8Array(MAX_BODIES);   // 0=planet,1=star,2=particle,3=bh
+const bCR=new Uint8Array(MAX_BODIES),   bCG=new Uint8Array(MAX_BODIES);
+const bCB=new Uint8Array(MAX_BODIES),   bCA=new Uint8Array(MAX_BODIES);
+let bodyCount = 0;
+
+const starX=new Float32Array(MAX_STARS),starY=new Float32Array(MAX_STARS);
+const starSz=new Float32Array(MAX_STARS),starA=new Uint8Array(MAX_STARS);
+
+const wActive=new Uint8Array(MAX_WAVES),wPX=new Float32Array(MAX_WAVES),wPY=new Float32Array(MAX_WAVES);
+const wR=new Float32Array(MAX_WAVES),wSp=new Float32Array(MAX_WAVES),wStr=new Float32Array(MAX_WAVES);
+const wMR=new Float32Array(MAX_WAVES),wTh=new Float32Array(MAX_WAVES),wLf=new Float32Array(MAX_WAVES);
+
+// ═══════════════ BH TREE ═══════════════
+const BH_MAX = 120000;
+const bhCX=new Float32Array(BH_MAX), bhCY=new Float32Array(BH_MAX);
+const bhHL=new Float32Array(BH_MAX), bhTM=new Float32Array(BH_MAX);
+const bhCMX=new Float32Array(BH_MAX),bhCMY=new Float32Array(BH_MAX);
+const bhCH=new Int32Array(BH_MAX*4), bhBI=new Int32Array(BH_MAX);
+let bhCount=0;
+const bhStk=new Int32Array(4096);
+
+// ═══════════════ CAMERA & INPUT ═══════════════
+const cam={x:0,y:0,zoom:1,offX:600,offY:374};
+let camVX=0,camVY=0,followIdx=-1,followLast={x:0,y:0};
+let spawning=false,spawnStart={x:0,y:0},spawnNow={x:0,y:0};
+let lmbPP={x:0,y:0},lmbDD=0,rmbPP={x:0,y:0},rmbDD=0,rmbDown=false;
+let spawnMode=0, ctxOpen=false,ctxWP={x:0,y:0},ctxSP={x:0,y:0};
+let lastMX=0,lastMY=0;
+let paused=false,trails=true,glow=true,useBloom=true;
+let flashAmt=0,shakeAmt=0;
+let fpsSmooth=60,lastT=performance.now();
+const keys={};
+
+// ═══════════════ MATH HELPERS ═══════════════
+const clamp=(x,a,b)=>x<a?a:x>b?b:x;
+const rnd=(a,b)=>a+(b-a)*Math.random();
+const randDir=()=>{const a=Math.random()*Math.PI*2;return{x:Math.cos(a),y:Math.sin(a)};};
+const m2r=(m)=>2.5+Math.pow(m,0.35)*0.6;
+const vlen=(dx,dy)=>Math.sqrt(dx*dx+dy*dy);
+const w2s=(wx,wy)=>({x:(wx-cam.x)*cam.zoom+cam.offX,y:(wy-cam.y)*cam.zoom+cam.offY});
+const s2w=(sx,sy)=>({x:(sx-cam.offX)/cam.zoom+cam.x,y:(sy-cam.offY)/cam.zoom+cam.y});
+
+// ═══════════════ BODY MANAGEMENT ═══════════════
+function addBody(type,px,py,vx,vy,mass,radius,cr,cg,cb,life){
+  if(bodyCount>=MAX_BODIES)return -1;
+  const i=bodyCount++;
+  bT[i]=type;bPX[i]=px;bPY[i]=py;bVX[i]=vx;bVY[i]=vy;
+  bAX[i]=0;bAY[i]=0;bM[i]=mass;bR[i]=radius;
+  bCR[i]=cr;bCG[i]=cg;bCB[i]=cb;bCA[i]=255;
+  bLF[i]=life||0;bML[i]=life||0;
+  return i;
+}
+function removeBody(i){
+  const L=bodyCount-1;
+  if(i!==L){
+    bT[i]=bT[L];bPX[i]=bPX[L];bPY[i]=bPY[L];bVX[i]=bVX[L];bVY[i]=bVY[L];
+    bAX[i]=bAX[L];bAY[i]=bAY[L];bM[i]=bM[L];bR[i]=bR[L];
+    bCR[i]=bCR[L];bCG[i]=bCG[L];bCB[i]=bCB[L];bCA[i]=bCA[L];
+    bLF[i]=bLF[L];bML[i]=bML[L];
+    if(followIdx===L)followIdx=i;
+  }
+  bodyCount--;
+  if(followIdx>=bodyCount)followIdx=-1;
+}
+function addWave(px,py,str){
+  for(let i=0;i<MAX_WAVES;i++)if(!wActive[i]){
+    wActive[i]=1;wPX[i]=px;wPY[i]=py;wR[i]=5;wSp[i]=700;
+    wStr[i]=str;wMR[i]=2500;wTh[i]=14;wLf[i]=1;return;
+  }
+}
+
+// ═══════════════ BARNES-HUT ═══════════════
+function bhAlloc(cx,cy,half){
+  if(bhCount>=BH_MAX)return -1;
+  const n=bhCount++;
+  bhCX[n]=cx;bhCY[n]=cy;bhHL[n]=half;bhTM[n]=0;bhCMX[n]=cx;bhCMY[n]=cy;
+  const b=n*4;bhCH[b]=bhCH[b+1]=bhCH[b+2]=bhCH[b+3]=-1;bhBI[n]=-1;
+  return n;
+}
+function bhInsert(ni,bi){
+  if(ni<0)return;
+  const bm=bM[bi],bx=bPX[bi],by=bPY[bi];
+  const nM=bhTM[ni]+bm;
+  bhCMX[ni]=(bhCMX[ni]*bhTM[ni]+bx*bm)/nM;
+  bhCMY[ni]=(bhCMY[ni]*bhTM[ni]+by*bm)/nM;
+  bhTM[ni]=nM;
+  const base=ni*4;
+  if(bhBI[ni]===-1&&bhCH[base]===-1&&bhCH[base+1]===-1&&bhCH[base+2]===-1&&bhCH[base+3]===-1){
+    bhBI[ni]=bi;return;
+  }
+  if(bhBI[ni]>=0){
+    const ex=bhBI[ni]; bhBI[ni]=-1;
+    const h2=bhHL[ni]*0.5,cx=bhCX[ni],cy=bhCY[ni];
+    const qe=(bPX[ex]>=cx?1:0)+(bPY[ex]>=cy?2:0);
+    if(bhCH[base+qe]===-1)bhCH[base+qe]=bhAlloc(cx+(qe&1?h2:-h2),cy+(qe&2?h2:-h2),h2);
+    bhInsert(bhCH[base+qe],ex);
+  }
+  const h2=bhHL[ni]*0.5,cx=bhCX[ni],cy=bhCY[ni];
+  const q=(bx>=cx?1:0)+(by>=cy?2:0);
+  if(bhCH[base+q]===-1)bhCH[base+q]=bhAlloc(cx+(q&1?h2:-h2),cy+(q&2?h2:-h2),h2);
+  bhInsert(bhCH[base+q],bi);
+}
+function bhBuild(){
+  bhCount=0;let cnt=0;
+  for(let i=0;i<bodyCount;i++)if(bT[i]!==2)cnt++;
+  if(!cnt)return;
+  let x0=1e18,x1=-1e18,y0=1e18,y1=-1e18;
+  for(let i=0;i<bodyCount;i++){
+    if(bT[i]===2)continue;
+    if(bPX[i]<x0)x0=bPX[i];if(bPX[i]>x1)x1=bPX[i];
+    if(bPY[i]<y0)y0=bPY[i];if(bPY[i]>y1)y1=bPY[i];
+  }
+  bhAlloc((x0+x1)/2,(y0+y1)/2,Math.max(x1-x0,y1-y0)/2+1);
+  for(let i=0;i<bodyCount;i++)if(bT[i]!==2)bhInsert(0,i);
+}
+const naX=new Float32Array(MAX_BODIES),naY=new Float32Array(MAX_BODIES);
+function bhQuery(px,py,qi,outIdx){
+  let sp=0;bhStk[sp++]=0;
+  let ax=0,ay=0;
+  while(sp>0){
+    const ni=bhStk[--sp];
+    if(ni<0||bhTM[ni]===0)continue;
+    if(bhBI[ni]===qi)continue;
+    const dx=bhCMX[ni]-px,dy=bhCMY[ni]-py;
+    const d2=dx*dx+dy*dy+SOFT*SOFT,d=Math.sqrt(d2);
+    const s=bhHL[ni]*2,base=ni*4;
+    if(bhBI[ni]>=0||(s/d)<BH_THETA){
+      const am=G_SIM*bhTM[ni]/d2;ax+=(dx/d)*am;ay+=(dy/d)*am;
+    }else{for(let c=0;c<4;c++){const ch=bhCH[base+c];if(ch!==-1)bhStk[sp++]=ch;}}
+  }
+  naX[outIdx]=ax;naY[outIdx]=ay;
+}
+
+// ═══════════════ PHYSICS ═══════════════
+function verletStep(dt){
+  const hh=0.5*dt*dt;
+  for(let i=0;i<bodyCount;i++){
+    if(bT[i]===2){bPX[i]+=bVX[i]*dt;bPY[i]+=bVY[i]*dt;bLF[i]-=dt;bCA[i]=clamp(bLF[i]/bML[i],0,1)*255|0;continue;}
+    bPX[i]+=bVX[i]*dt+bAX[i]*hh;bPY[i]+=bVY[i]*dt+bAY[i]*hh;
+  }
+  bhBuild();
+  for(let i=0;i<bodyCount;i++){if(bT[i]===2){naX[i]=naY[i]=0;continue;}bhQuery(bPX[i],bPY[i],i,i);}
+  for(let i=0;i<bodyCount;i++){
+    if(bT[i]===2)continue;
+    bVX[i]+=0.5*(bAX[i]+naX[i])*dt;bVY[i]+=0.5*(bAY[i]+naY[i])*dt;
+    bAX[i]=naX[i];bAY[i]=naY[i];
+  }
+}
+function applyWaves(dt){
+  for(let w=0;w<MAX_WAVES;w++){
+    if(!wActive[w])continue;
+    wR[w]+=wSp[w]*dt;wLf[w]-=dt*0.4;
+    if(wLf[w]<=0||wR[w]>wMR[w]){wActive[w]=0;continue;}
+    for(let i=0;i<bodyCount;i++){
+      if(bT[i]===2)continue;
+      const dx=bPX[i]-wPX[w],dy=bPY[i]-wPY[w],d=vlen(dx,dy);
+      if(d>wR[w]-wTh[w]&&d<wR[w]+wTh[w]){
+        const nx=d>0.001?dx/d:0,ny=d>0.001?dy/d:0;
+        const imp=wStr[w]*clamp(1-wR[w]/wMR[w],0,1)/(bM[i]+5);
+        bVX[i]+=nx*imp;bVY[i]+=ny*imp;
+      }
+    }
+  }
+}
+function applyBH(dt){
+  for(let j=0;j<bodyCount;j++){
+    if(bT[j]!==3)continue;
+    for(let i=0;i<bodyCount;i++){
+      if(i===j||bT[i]===2)continue;
+      const dx=bPX[j]-bPX[i],dy=bPY[j]-bPY[i];
+      const d2=dx*dx+dy*dy+10,d=Math.sqrt(d2);
+      const pull=bM[j]*1200/d2;
+      bVX[i]+=dx/d*pull*dt;bVY[i]+=dy/d*pull*dt;
+      if(d<bR[j]+bR[i]+3){removeBody(i);if(i<j)j--;i--;}
+    }
+  }
+}
+function handleCollisions(){
+  for(let i=0;i<bodyCount;i++){
+    if(bT[i]===2)continue;
+    for(let j=i+1;j<bodyCount;j++){
+      if(bT[j]===2||bT[i]===3||bT[j]===3)continue;
+      const dx=bPX[j]-bPX[i],dy=bPY[j]-bPY[i];
+      if(dx*dx+dy*dy>=(bR[i]+bR[j])*(bR[i]+bR[j]))continue;
+      const m1=bM[i],m2=bM[j],m=m1+m2;
+      const cvx=(bVX[i]*m1+bVX[j]*m2)/m,cvy=(bVY[i]*m1+bVY[j]*m2)/m;
+      const cpx=(bPX[i]*m1+bPX[j]*m2)/m,cpy=(bPY[i]*m1+bPY[j]*m2)/m;
+      const rv=vlen(bVX[i]-bVX[j],bVY[i]-bVY[j]);
+      const E=rv*m;
+      if(rv>=FRAG_VEL&&m1>=FRAG_MASS&&m2>=FRAG_MASS){
+        spawnFragSparks(cpx,cpy,E);
+        const nf=3+Math.random()*3|0;
+        for(let f=0;f<nf&&bodyCount<MAX_BODIES-1;f++){
+          const fm=Math.max(1.5,m/nf),d=randDir();
+          const kick=rnd(80,rv*0.6),sign=f%2===0?1:-1;
+          addBody(fm>140?1:0,cpx,cpy,cvx+d.x*kick*sign,cvy+d.y*kick*sign,fm,m2r(fm),
+            clamp((bCR[i]+bCR[j])/2+rnd(-30,30),50,255)|0,
+            clamp((bCG[i]+bCG[j])/2+rnd(-30,30),50,255)|0,
+            clamp((bCB[i]+bCB[j])/2+rnd(-30,30),50,255)|0);
+        }
+        removeBody(j);removeBody(i);i--;break;
+      }
+      spawnMergeSparks(cpx,cpy,E);
+      bM[i]=m;bPX[i]=cpx;bPY[i]=cpy;bVX[i]=cvx;bVY[i]=cvy;
+      bR[i]=m2r(m);bT[i]=m>160?1:0;
+      bCR[i]=(bCR[i]+bCR[j])/2|0;bCG[i]=(bCG[i]+bCG[j])/2|0;bCB[i]=(bCB[i]+bCB[j])/2|0;
+      bAX[i]=0;bAY[i]=0;removeBody(j);j--;
+    }
+  }
+}
+function cleanParticles(){for(let i=0;i<bodyCount;i++)if(bT[i]===2&&bLF[i]<=0){removeBody(i);i--;}}
+function spawnMergeSparks(px,py,E){
+  const n=clamp(E*0.15|0,15,150);
+  for(let i=0;i<n;i++){const d=randDir(),sp=rnd(80,450)+E*0.08,ml=rnd(0.5,1.8);addBody(2,px,py,d.x*sp,d.y*sp,0.05,rnd(1,3),200+Math.random()*55|0,120+Math.random()*120|0,30+Math.random()*80|0,ml);}
+}
+function spawnFragSparks(px,py,E){
+  const n=clamp(E*0.15|0,20,200);
+  for(let i=0;i<n;i++){const d=randDir(),sp=rnd(150,600),ml=rnd(0.4,1.5);addBody(2,px,py,d.x*sp,d.y*sp,0.05,rnd(0.8,2.5),180+Math.random()*75|0,60+Math.random()*100|0,20+Math.random()*50|0,ml);}
+}
+function spawnAccretion(px,py){
+  const n=50+Math.random()*100|0;
+  for(let i=0;i<n;i++){const d=randDir(),sr=rnd(60,240),sp=200*rnd(0.6,1.5),ml=rnd(0.8,2.5);addBody(2,px+d.x*sr,py+d.y*sr,-d.y*sp,d.x*sp,0.1,rnd(1,3.5),100+Math.random()*80|0,60+Math.random()*80|0,200+Math.random()*55|0,ml);}
+}
+function supernova(idx){
+  if(idx<0||idx>=bodyCount||bT[idx]===2)return;
+  const px=bPX[idx],py=bPY[idx],mass=bM[idx],vx=bVX[idx],vy=bVY[idx];
+  removeBody(idx);flashAmt=1;shakeAmt=1;
+  addWave(px,py,1500+mass*0.7);
+  const dc=clamp(mass*2.8|0,200,800);
+  for(let i=0;i<dc;i++){const d=randDir(),sp=rnd(220,900),ml=rnd(0.9,3);addBody(2,px,py,d.x*sp,d.y*sp,0.1,rnd(1,4),220+Math.random()*35|0,90+Math.random()*150|0,20+Math.random()*60|0,ml);}
+  if(mass>3200){addBody(3,px,py,vx,vy,mass*0.7,12+mass*0.003,20,20,25);spawnAccretion(px,py);}
+  else addBody(1,px,py,vx,vy,mass*0.35,8,200,200,255);
+}
+function superBiggest(){let b=-1,bm=0;for(let i=0;i<bodyCount;i++)if(bT[i]!==2&&bM[i]>bm){bm=bM[i];b=i;}if(b!==-1)supernova(b);}
+function superNearest(wx,wy){let b=-1,bd=1e18;for(let i=0;i<bodyCount;i++){if(bT[i]===2)continue;const dx=bPX[i]-wx,dy=bPY[i]-wy,d=dx*dx+dy*dy;if(d<bd){bd=d;b=i;}}if(b!==-1)supernova(b);}
+
+// ═══════════════ INIT ═══════════════
+function initStars(){
+  for(let i=0;i<MAX_STARS;i++){starX[i]=rnd(-10000,10000);starY[i]=rnd(-10000,10000);starSz[i]=rnd(1,3);starA[i]=30+Math.random()*210|0;}
+}
+function resetDemo(){
+  bodyCount=0;for(let i=0;i<MAX_WAVES;i++)wActive[i]=0;followIdx=-1;
+  addBody(1,0,0,0,0,10000,26,255,230,120);
+  addBody(0,280,0,0,145,45,m2r(45),100,180,255);
+  addBody(0,-420,0,0,-110,80,m2r(80),120,255,150);
+  addBody(0,0,520,-105,0,65,m2r(65),255,150,90);
+  addBody(0,310,0,0,220,6,m2r(6),230,230,230);
+  trailCtx.fillStyle='rgb(3,8,16)';trailCtx.fillRect(0,0,simCanvas.width,simCanvas.height);
+}
+function buildSpawnBody(mode,px,py,vx,vy){
+  if(mode===0){const m=20+Math.random()*120;addBody(0,px,py,vx,vy,m,m2r(m),60+Math.random()*140|0,100+Math.random()*155|0,180+Math.random()*75|0);}
+  else if(mode===1){const m=160+Math.random()*840;addBody(1,px,py,vx,vy,m,m2r(m),220+Math.random()*35|0,180+Math.random()*75|0,40+Math.random()*80|0);}
+  else if(mode===2){const m=800+Math.random()*9200;addBody(3,px,py,vx,vy,m,12+m*0.003,20,20,25);}
+  else{const m=20+Math.random()*260;addBody(m>140?1:0,px,py,vx,vy,m,m2r(m),80+Math.random()*175|0,80+Math.random()*175|0,80+Math.random()*175|0);}
+}
+
+// ═══════════════ DRAW ═══════════════
+function heatCol(sp){const t=clamp(sp/450,0,1);return{r:80+175*t|0,g:50+150*(1-t)|0,b:255-160*t|0};}
+
+function drawScene(c,sdx,sdy){
+  c.save();
+  c.translate(cam.offX+sdx,cam.offY+sdy);
+  c.scale(cam.zoom,cam.zoom);
+  c.translate(-cam.x,-cam.y);
+
+  c.fillStyle='#fff';
+  for(let i=0;i<MAX_STARS;i++){c.globalAlpha=starA[i]/255;c.beginPath();c.arc(starX[i],starY[i],starSz[i],0,Math.PI*2);c.fill();}
+  c.globalAlpha=1;
+
+  for(let w=0;w<MAX_WAVES;w++){
+    if(!wActive[w])continue;
+    c.strokeStyle=`rgba(255,200,120,${wLf[w].toFixed(2)})`;
+    c.lineWidth=wTh[w];
+    c.beginPath();c.arc(wPX[w],wPY[w],wR[w],0,Math.PI*2);c.stroke();
+  }
+
+  for(let i=0;i<bodyCount;i++){
+    const px=bPX[i],py=bPY[i],r=bR[i];
+    const ca=bCA[i]/255;
+    if(bT[i]===2){c.globalAlpha=ca;c.fillStyle=`rgb(${bCR[i]},${bCG[i]},${bCB[i]})`;c.beginPath();c.arc(px,py,r,0,Math.PI*2);c.fill();c.globalAlpha=1;continue;}
+    const h=heatCol(vlen(bVX[i],bVY[i]));
+    const cr=(bCR[i]+h.r)/2|0,cg=(bCG[i]+h.g)/2|0,cb=(bCB[i]+h.b)/2|0;
+    if(bT[i]===3){
+      c.fillStyle='rgba(120,80,255,0.10)';c.beginPath();c.arc(px,py,r+22,0,Math.PI*2);c.fill();
+      c.fillStyle='rgba(100,60,220,0.22)';c.beginPath();c.arc(px,py,r+14,0,Math.PI*2);c.fill();
+      c.fillStyle='#000';c.beginPath();c.arc(px,py,r,0,Math.PI*2);c.fill();
+    }else if(glow){
+      for(let g2=7;g2>=1;g2--){c.globalAlpha=(8+g2*8)/255;c.fillStyle=`rgb(${cr},${cg},${cb})`;c.beginPath();c.arc(px,py,r+g2*7,0,Math.PI*2);c.fill();}
+      c.globalAlpha=1;c.fillStyle=`rgb(${cr},${cg},${cb})`;c.beginPath();c.arc(px,py,r,0,Math.PI*2);c.fill();
+    }else{c.fillStyle=`rgb(${cr},${cg},${cb})`;c.beginPath();c.arc(px,py,r,0,Math.PI*2);c.fill();}
+    if(i===followIdx){c.strokeStyle='rgba(255,184,77,0.85)';c.lineWidth=2/cam.zoom;c.beginPath();c.arc(px,py,r+10/cam.zoom,0,Math.PI*2);c.stroke();}
+  }
+  if(spawning&&lmbDD>=CLICK_THRESH){
+    const sw=s2w(lmbPP.x,lmbPP.y),ew=s2w(lastMX,lastMY);
+    c.strokeStyle='#ff4455';c.lineWidth=2/cam.zoom;c.beginPath();c.moveTo(sw.x,sw.y);c.lineTo(ew.x,ew.y);c.stroke();
+    c.fillStyle='#fff';c.beginPath();c.arc(sw.x,sw.y,5/cam.zoom,0,Math.PI*2);c.fill();
+  }
+  c.restore();
+}
+
+// ═══════════════ RENDER LOOP ═══════════════
+function simFrame(now){
+  const dt=Math.min((now-lastT)/1000,0.05);lastT=now;
+  const iFPS=dt>0?1/dt:60;fpsSmooth+=(iFPS-fpsSmooth)*(dt/0.5);
+  flashAmt=clamp(flashAmt-dt*1.5,0,1);shakeAmt=clamp(shakeAmt-dt*1.2,0,1);
+
+  if(followIdx===-1){
+    const fs=FLY_SPD/cam.zoom;let dx=0,dy=0;
+    if(keys['w']||keys['arrowup'])dy-=fs;if(keys['s']||keys['arrowdown'])dy+=fs;
+    if(keys['a']||keys['arrowleft'])dx-=fs;if(keys['d']||keys['arrowright'])dx+=fs;
+    if(dx||dy){cam.x+=dx*dt;cam.y+=dy*dt;camVX=dx;camVY=dy;}
+  }
+  if(!rmbDown&&followIdx===-1){
+    cam.x+=camVX*dt;cam.y+=camVY*dt;
+    camVX*=CAM_FRIC;camVY*=CAM_FRIC;
+    if(Math.abs(camVX)<0.1)camVX=0;if(Math.abs(camVY)<0.1)camVY=0;
+  }
+  if(followIdx>=0){
+    if(followIdx>=bodyCount||bT[followIdx]===2){cam.x=followLast.x;cam.y=followLast.y;followIdx=-1;}
+    else{followLast.x=bPX[followIdx];followLast.y=bPY[followIdx];cam.x+=(bPX[followIdx]-cam.x)*(1-FOLLOW_LAG);cam.y+=(bPY[followIdx]-cam.y)*(1-FOLLOW_LAG);camVX=camVY=0;}
+  }
+
+  if(!paused){
+    const step=dt/2;
+    for(let s=0;s<2;s++){applyWaves(step);applyBH(step);verletStep(step);handleCollisions();}
+    cleanParticles();
+  }
+
+  const sk=12*shakeAmt;
+  const sdx=shakeAmt>0?rnd(-sk,sk):0,sdy=shakeAmt>0?rnd(-sk,sk):0;
+
+  if(trails){
+    const fa=clamp(35*(dt*60)|0,8,60);
+    trailCtx.fillStyle=`rgba(3,8,16,${(fa/255).toFixed(3)})`;
+    trailCtx.fillRect(0,0,simCanvas.width,simCanvas.height);
+    drawScene(trailCtx,sdx,sdy);
+  }
+
+  if(useBloom){
+    offCtx.fillStyle='rgb(3,8,16)';offCtx.fillRect(0,0,simCanvas.width,simCanvas.height);
+    if(trails)offCtx.drawImage(trailCanvas,0,0);else drawScene(offCtx,sdx,sdy);
+    simCtx.clearRect(0,0,simCanvas.width,simCanvas.height);
+    simCtx.drawImage(offCanvas,0,0);
+    simCtx.save();simCtx.filter='blur(6px) brightness(1.7)';simCtx.globalCompositeOperation='screen';simCtx.globalAlpha=0.38;simCtx.drawImage(offCanvas,0,0);simCtx.restore();
+  }else{
+    if(!trails){simCtx.fillStyle='rgb(3,8,16)';simCtx.fillRect(0,0,simCanvas.width,simCanvas.height);drawScene(simCtx,sdx,sdy);}
+    else simCtx.drawImage(trailCanvas,0,0);
+  }
+
+  document.getElementById('flash-overlay').style.background=flashAmt>0?`rgba(255,240,200,${(flashAmt*0.78).toFixed(2)})`:'rgba(255,240,200,0)';
+  updateHUD();
+  requestAnimationFrame(simFrame);
+}
+
+function updateHUD(){
+  let np=0;for(let i=0;i<bodyCount;i++)if(bT[i]!==2)np++;
+  const fps=fpsSmooth+0.5|0;
+  const fe=document.getElementById('sim-fps');
+  fe.textContent=fps+' FPS';
+  fe.style.color=fps>=55?'#3affa0':fps>=30?'#ffb84d':'#ff5566';
+  document.getElementById('sim-status').textContent=
+    `Bodies: ${bodyCount} | Physics: ${np} | BH nodes: ${bhCount} | Zoom: ${cam.zoom.toFixed(2)}x | Bloom: ${useBloom?'ON':'OFF'}`;
+  document.getElementById('paused-banner').style.display=paused?'block':'none';
+  const ip=document.getElementById('sim-info-panel');
+  const nh=document.getElementById('sim-no-follow');
+  if(followIdx>=0&&followIdx<bodyCount&&bT[followIdx]!==2){
+    ip.style.display='block';nh.style.display='none';
+    document.getElementById('ip-type').textContent=['PLANET','STAR','PARTICLE','BLACK HOLE'][bT[followIdx]];
+    const sp=vlen(bVX[followIdx],bVY[followIdx]),dist=vlen(bPX[followIdx],bPY[followIdx]);
+    document.getElementById('ip-stats').innerHTML=`Mass &nbsp;&nbsp;: ${bM[followIdx].toFixed(1)}<br>Speed &nbsp;: ${sp.toFixed(1)} px/s<br>Radius : ${bR[followIdx].toFixed(1)} px<br>Dist &nbsp;&nbsp;: ${dist.toFixed(0)} from origin`;
+  }else{ip.style.display='none';nh.style.display=followIdx===-1?'block':'none';}
+  document.querySelectorAll('.tb-btn').forEach((b,i)=>b.classList.toggle('sel',i===spawnMode));
+}
+
+// ═══════════════ TOOLBAR ═══════════════
+function buildToolbar(){
+  const tb=document.getElementById('sim-toolbar');
+  tb.innerHTML='';
+  const icons=[{col:'#64b4ff',bh:false},{col:'#ffdc50',bh:false},{col:'#a050ff',bh:true},{col:'#b4b4b4',bh:false}];
+  SPAWN_TYPES.forEach((t,i)=>{
+    const btn=document.createElement('div');
+    btn.className='tb-btn'+(i===0?' sel':'');
+    btn.innerHTML=`<div class="tb-sel-bar" style="background:${icons[i].col}"></div>
+      <div class="tb-icon" style="background:${icons[i].col};${i===2?'position:relative':''}">${i===2?`<div style="width:12px;height:12px;border-radius:50%;background:#000;position:absolute"></div>`:(i===0?'P':i===1?'S':'?')}</div>
+      <div class="tb-label">${t.name}</div><div class="tb-hint">[${i+1}]</div>`;
+    btn.addEventListener('click',()=>{spawnMode=i;});
+    tb.appendChild(btn);
+  });
+}
+function buildCtxMenu(){
+  const cm=document.getElementById('ctx-menu');
+  cm.innerHTML='<div class="ctx-title">SPAWN AT CURSOR</div>';
+  const cs=['#64b4ff','#ffdc50','#a050ff','#b4b4b4'];
+  SPAWN_TYPES.forEach((t,i)=>{
+    const item=document.createElement('div');item.className='ctx-item';
+    item.innerHTML=`<div class="ctx-dot" style="background:${cs[i]}${i===2?';border:3px solid #000':''}"></div><span>${t.name}</span><span class="ctx-key">[${i+1}]</span>`;
+    item.addEventListener('click',e=>{e.stopPropagation();spawnMode=i;buildSpawnBody(i,ctxWP.x,ctxWP.y,0,0);closeCtx();});
+    cm.appendChild(item);
+  });
+}
+function openCtx(sx,sy,wx,wy){ctxOpen=true;ctxWP={x:wx,y:wy};ctxSP={x:sx,y:sy};const cm=document.getElementById('ctx-menu');let mx=sx,my=sy;if(mx+165>window.innerWidth)mx=window.innerWidth-170;if(my+200>window.innerHeight)my=window.innerHeight-205;cm.style.left=mx+'px';cm.style.top=my+'px';cm.style.display='block';}
+function closeCtx(){ctxOpen=false;document.getElementById('ctx-menu').style.display='none';}
+
+// ═══════════════ INPUT ═══════════════
+window.addEventListener('keydown',e=>{
+  keys[e.key.toLowerCase()]=true;
+  const k=e.key.toLowerCase();
+  if(k===' '){paused=!paused;e.preventDefault();}
+  else if(k==='t')trails=!trails;
+  else if(k==='g')glow=!glow;
+  else if(k==='b')useBloom=!useBloom;
+  else if(k==='c'){bodyCount=0;followIdx=-1;trailCtx.fillStyle='rgb(3,8,16)';trailCtx.fillRect(0,0,simCanvas.width,simCanvas.height);}
+  else if(k==='r')resetDemo();
+  else if(k==='f')followIdx=-1;
+  else if(k==='m')superBiggest();
+  else if(k==='n'){const w=s2w(lastMX,lastMY);superNearest(w.x,w.y);}
+  else if(k==='1'||k==='p')spawnMode=0;
+  else if(k==='2')spawnMode=1;
+  else if(k==='3'||k==='h')spawnMode=2;
+  else if(k==='4')spawnMode=3;
+});
+window.addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=false;});
+
+simCanvas.addEventListener('mousemove',e=>{
+  lastMX=e.clientX;lastMY=e.clientY;
+  if(rmbDown){
+    cam.x-=e.movementX/cam.zoom;cam.y-=e.movementY/cam.zoom;
+    camVX=-e.movementX/cam.zoom/(1/60);camVY=-e.movementY/cam.zoom/(1/60);
+    followIdx=-1;
+    const ds=e.clientX-rmbPP.x,dd=e.clientY-rmbPP.y;rmbDD=vlen(ds,dd);
+  }
+  if(spawning){const ds=e.clientX-lmbPP.x,dd=e.clientY-lmbPP.y;lmbDD=vlen(ds,dd);spawnNow=s2w(e.clientX,e.clientY);}
+});
+simCanvas.addEventListener('mousedown',e=>{
+  if(e.button===0){
+    if(e.clientX>simCanvas.width-130)return;
+    if(ctxOpen){closeCtx();return;}
+    lmbPP={x:e.clientX,y:e.clientY};lmbDD=0;spawning=true;
+    spawnStart=s2w(e.clientX,e.clientY);spawnNow={...spawnStart};
+  }
+  if(e.button===2){rmbPP={x:e.clientX,y:e.clientY};rmbDD=0;rmbDown=true;if(ctxOpen)closeCtx();}
+});
+simCanvas.addEventListener('mouseup',e=>{
+  if(e.button===0&&spawning){
+    spawning=false;
+    if(lmbDD<CLICK_THRESH){
+      const w=s2w(lmbPP.x,lmbPP.y);let pk=-1,bd=1e18;
+      for(let i=0;i<bodyCount;i++){if(bT[i]===2)continue;const dx=bPX[i]-w.x,dy=bPY[i]-w.y,d2=dx*dx+dy*dy,r=bR[i]+12/cam.zoom;if(d2<r*r&&d2<bd){bd=d2;pk=i;}}
+      if(pk!==-1){followIdx=pk;followLast={x:bPX[pk],y:bPY[pk]};camVX=camVY=0;}else followIdx=-1;
+    }else{
+      const vx=(spawnStart.x-spawnNow.x)*2.2,vy=(spawnStart.y-spawnNow.y)*2.2;
+      buildSpawnBody(spawnMode,spawnStart.x,spawnStart.y,vx,vy);
+    }
+  }
+  if(e.button===2){
+    rmbDown=false;
+    if(rmbDD<CLICK_THRESH&&e.clientX<simCanvas.width-130&&!ctxOpen)openCtx(rmbPP.x,rmbPP.y,...Object.values(s2w(rmbPP.x,rmbPP.y)));
+    camVX*=0.5;camVY*=0.5;
+  }
+});
+simCanvas.addEventListener('wheel',e=>{
+  e.preventDefault();
+  const ms={x:e.clientX,y:e.clientY},mw=s2w(ms.x,ms.y);
+  const delta=e.deltaY<0?1:-1,zd=delta*0.12*cam.zoom;
+  cam.zoom=clamp(cam.zoom+zd,0.02,20);
+  cam.x=mw.x-(ms.x-cam.offX)/cam.zoom;cam.y=mw.y-(ms.y-cam.offY)/cam.zoom;
+  camVX*=0.5;camVY*=0.5;
+},{passive:false});
+simCanvas.addEventListener('contextmenu',e=>e.preventDefault());
+document.addEventListener('mousedown',e=>{if(ctxOpen&&!document.getElementById('ctx-menu').contains(e.target))closeCtx();});
+
+// ═══════════════ MINI DEMO: BH TREE ═══════════════
+function startBHDemo(){
+  bhDemoRunning = true;
+  const canvas = document.getElementById('bh-canvas');
+  if(!canvas)return;
+  const c = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  // Small body set for BH visualization
+  let demo_bodies = [];
+  function initBHBodies(){
+    demo_bodies = [];
+    for(let i=0;i<55;i++){
+      demo_bodies.push({
+        x: rnd(30,W-30), y: rnd(20,H-20),
+        m: rnd(2,20), r: rnd(2,6),
+        col: `hsl(${Math.random()*360},80%,70%)`
+      });
+    }
+  }
+  initBHBodies();
+
+  // Simple quadtree for visualization
+  function buildVizTree(bodies, x0, y0, x1, y1, depth){
+    if(bodies.length===0||depth>8)return null;
+    const cx=(x0+x1)/2,cy=(y0+y1)/2;
+    let totalM=0,comX=0,comY=0;
+    bodies.forEach(b=>{totalM+=b.m;comX+=b.x*b.m;comY+=b.y*b.m;});
+    comX/=totalM;comY/=totalM;
+    const node={x0,y0,x1,y1,comX,comY,totalM,bodies,children:null};
+    if(bodies.length>1&&(x1-x0)>8){
+      const NW=bodies.filter(b=>b.x<cx&&b.y<cy);
+      const NE=bodies.filter(b=>b.x>=cx&&b.y<cy);
+      const SW=bodies.filter(b=>b.x<cx&&b.y>=cy);
+      const SE=bodies.filter(b=>b.x>=cx&&b.y>=cy);
+      node.children=[buildVizTree(NW,x0,y0,cx,cy,depth+1),buildVizTree(NE,cx,y0,x1,cy,depth+1),buildVizTree(SW,x0,cy,cx,y1,depth+1),buildVizTree(SE,cx,cy,x1,y1,depth+1)];
+    }
+    return node;
+  }
+
+  let hoveredBody = null;
+  let usedCells = new Set();
+
+  function collectUsedCells(node, qx, qy, cells){
+    if(!node||node.totalM===0)return;
+    const dx=node.comX-qx,dy=node.comY-qy;
+    const d=Math.sqrt(dx*dx+dy*dy)+0.001;
+    const s=node.x1-node.x0;
+    if(node.bodies.length===1||(s/d)<0.85||!node.children){
+      cells.add(node);
+    }else if(node.children){
+      node.children.forEach(ch=>{if(ch)collectUsedCells(ch,qx,qy,cells);});
+    }
+  }
+
+  function drawTree(node, depth){
+    if(!node)return;
+    const alpha=Math.max(0.04,0.18-depth*0.025);
+    c.strokeStyle=`rgba(0,212,255,${alpha})`;
+    c.lineWidth=1;
+    c.strokeRect(node.x0,node.y0,node.x1-node.x0,node.y1-node.y0);
+    if(node.children)node.children.forEach(ch=>drawTree(ch,depth+1));
+  }
+
+  function drawUsedCells(cells){
+    cells.forEach(node=>{
+      c.fillStyle='rgba(0,212,255,0.08)';
+      c.fillRect(node.x0,node.y0,node.x1-node.x0,node.y1-node.y0);
+      c.strokeStyle='rgba(0,212,255,0.5)';
+      c.lineWidth=1.5;
+      c.strokeRect(node.x0,node.y0,node.x1-node.x0,node.y1-node.y0);
+      // Draw line to COM
+      if(hoveredBody){
+        c.strokeStyle='rgba(255,184,77,0.3)';c.lineWidth=1;
+        c.beginPath();c.moveTo(hoveredBody.x,hoveredBody.y);c.lineTo(node.comX,node.comY);c.stroke();
+      }
+    });
+  }
+
+  function bhDemoFrame(){
+    if(!bhDemoRunning)return;
+    if(document.getElementById('tab-learn').style.display==='none'||!document.getElementById('tab-learn').classList.contains('active'))return requestAnimationFrame(bhDemoFrame);
+
+    c.fillStyle='rgba(3,8,16,0.85)';c.fillRect(0,0,W,H);
+
+    const root=buildVizTree(demo_bodies,0,0,W,H,0);
+    drawTree(root,0);
+
+    const cells=new Set();
+    if(hoveredBody)collectUsedCells(root,hoveredBody.x,hoveredBody.y,cells);
+    drawUsedCells(cells);
+
+    demo_bodies.forEach((b,i)=>{
+      const isHov=b===hoveredBody;
+      c.fillStyle=isHov?'#ffb84d':b.col;
+      c.globalAlpha=isHov?1:0.85;
+      c.beginPath();c.arc(b.x,b.y,isHov?b.r+3:b.r,0,Math.PI*2);c.fill();
+      c.globalAlpha=1;
+      if(isHov){c.strokeStyle='rgba(255,184,77,0.6)';c.lineWidth=2;c.beginPath();c.arc(b.x,b.y,b.r+5,0,Math.PI*2);c.stroke();}
+    });
+
+    // COM dot for all
+    if(root){
+      c.fillStyle='rgba(255,184,77,0.5)';c.beginPath();c.arc(root.comX,root.comY,4,0,Math.PI*2);c.fill();
+    }
+
+    const info=document.getElementById('bh-demo-info');
+    if(info)info.textContent=hoveredBody?`θ criterion: cells used = ${cells.size} of ${countNodes(root)} total`:'hover a body to see θ criterion';
+
+    requestAnimationFrame(bhDemoFrame);
+  }
+
+  function countNodes(node){if(!node)return 0;let n=1;if(node.children)node.children.forEach(ch=>{n+=countNodes(ch);});return n;}
+
+  canvas.addEventListener('mousemove',e=>{
+    const rect=canvas.getBoundingClientRect();
+    const mx=(e.clientX-rect.left)*(W/rect.width);
+    const my=(e.clientY-rect.top)*(H/rect.height);
+    hoveredBody=null;let bd=30*30;
+    demo_bodies.forEach(b=>{const dx=b.x-mx,dy=b.y-my,d=dx*dx+dy*dy;if(d<bd){bd=d;hoveredBody=b;}});
+  });
+  canvas.addEventListener('mouseleave',()=>{hoveredBody=null;});
+  canvas.addEventListener('click',e=>{
+    const rect=canvas.getBoundingClientRect();
+    const mx=(e.clientX-rect.left)*(W/rect.width),my=(e.clientY-rect.top)*(H/rect.height);
+    demo_bodies.push({x:mx,y:my,m:rnd(2,20),r:rnd(2,6),col:`hsl(${Math.random()*360},80%,70%)`});
+    if(demo_bodies.length>120)demo_bodies.shift();
+  });
+
+  requestAnimationFrame(bhDemoFrame);
+}
+
+// ═══════════════ MINI DEMO: VERLET vs EULER ═══════════════
+function startVerletDemo(){
+  verletDemoRunning = true;
+  const ec=document.getElementById('euler-canvas');
+  const vc=document.getElementById('verlet-canvas');
+  if(!ec||!vc)return;
+  const eCtx=ec.getContext('2d'),vCtx=vc.getContext('2d');
+  const W=400,H=200,cx=W/2,cy=H/2;
+
+  // Two-body orbit: central star + planet
+  const Gd=4000; // demo G
+  function mkOrbit(){
+    const R=60,vOrb=Math.sqrt(Gd*8000/R);
+    return {px:cx+R,py:cy,vx:0,vy:vOrb,ax:0,ay:0,mass:10,trailE:[],trailV:[]};
+  }
+
+  let euler_state=mkOrbit(),verlet_state=mkOrbit();
+
+  function orbitalEnergy(px,py,vx,vy,M){
+    const r=vlen(px-cx,py-cy);
+    const KE=0.5*(vx*vx+vy*vy);
+    const PE=-Gd*M/r;
+    return KE+PE;
+  }
+
+  const E0_e=orbitalEnergy(euler_state.px,euler_state.py,euler_state.vx,euler_state.vy,8000);
+  const E0_v=orbitalEnergy(verlet_state.px,verlet_state.py,verlet_state.vx,verlet_state.vy,8000);
+
+  function forceOn(px,py,M){
+    const dx=cx-px,dy=cy-py,d2=dx*dx+dy*dy+4,d=Math.sqrt(d2);
+    const a=Gd*M/d2;
+    return{ax:dx/d*a,ay:dy/d*a};
+  }
+
+  function eulerStep(s,dt){
+    const f=forceOn(s.px,s.py,8000);
+    s.vx+=f.ax*dt;s.vy+=f.ay*dt;
+    s.px+=s.vx*dt;s.py+=s.vy*dt;
+  }
+  function verletStepD(s,dt){
+    s.px+=s.vx*dt+s.ax*0.5*dt*dt;s.py+=s.vy*dt+s.ay*0.5*dt*dt;
+    const f=forceOn(s.px,s.py,8000);
+    s.vx+=0.5*(s.ax+f.ax)*dt;s.vy+=0.5*(s.ay+f.ay)*dt;
+    s.ax=f.ax;s.ay=f.ay;
+  }
+
+  function drawOrbitCanvas(c2,state,label,isEuler){
+    c2.fillStyle='rgba(2,6,8,0.4)';c2.fillRect(0,0,W,H);
+    // Star
+    c2.fillStyle='rgba(255,220,80,0.3)';c2.beginPath();c2.arc(cx,cy,12,0,Math.PI*2);c2.fill();
+    c2.fillStyle='rgba(255,220,80,0.7)';c2.beginPath();c2.arc(cx,cy,6,0,Math.PI*2);c2.fill();
+    // Trail
+    const trail=isEuler?state.trailE:state.trailV;
+    if(trail.length>1){
+      c2.beginPath();c2.moveTo(trail[0].x,trail[0].y);
+      for(let i=1;i<trail.length;i++){const a=i/trail.length;c2.strokeStyle=`rgba(${isEuler?'255,85,102':'58,255,160'},${(a*0.6).toFixed(2)})`;c2.lineWidth=1;c2.lineTo(trail[i].x,trail[i].y);c2.stroke();c2.beginPath();c2.moveTo(trail[i].x,trail[i].y);}
+    }
+    // Planet
+    c2.fillStyle=isEuler?'#ff5566':'#3affa0';c2.beginPath();c2.arc(state.px,state.py,5,0,Math.PI*2);c2.fill();
+  }
+
+  let elapsed=0;
+  function verletDemoFrame(){
+    if(!verletDemoRunning)return;
+    if(!document.getElementById('tab-learn').classList.contains('active'))return requestAnimationFrame(verletDemoFrame);
+
+    const dt=1/120;
+    for(let s=0;s<3;s++){
+      eulerStep(euler_state,dt);
+      verletStepD(verlet_state,dt);
+      euler_state.trailE.push({x:euler_state.px,y:euler_state.py});
+      verlet_state.trailV.push({x:verlet_state.px,y:verlet_state.py});
+      if(euler_state.trailE.length>300)euler_state.trailE.shift();
+      if(verlet_state.trailV.length>300)verlet_state.trailV.shift();
+    }
+    elapsed+=dt*3;
+
+    drawOrbitCanvas(eCtx,euler_state,'Euler',true);
+    drawOrbitCanvas(vCtx,verlet_state,'Verlet',false);
+
+    const Ee=orbitalEnergy(euler_state.px,euler_state.py,euler_state.vx,euler_state.vy,8000);
+    const Ev=orbitalEnergy(verlet_state.px,verlet_state.py,verlet_state.vx,verlet_state.vy,8000);
+    const dE_e=((Ee-E0_e)/Math.abs(E0_e)*100);
+    const dE_v=((Ev-E0_v)/Math.abs(E0_v)*100);
+
+    const ee=document.getElementById('euler-energy');
+    const ve=document.getElementById('verlet-energy');
+    if(ee)ee.textContent=`ΔE/E₀ = ${dE_e>0?'+':''}${dE_e.toFixed(2)}% (t=${elapsed.toFixed(1)}s)`;
+    if(ve)ve.textContent=`ΔE/E₀ = ${dE_v>0?'+':''}${dE_v.toFixed(4)}%`;
+
+    // Reset Euler if it goes way off
+    if(vlen(euler_state.px-cx,euler_state.py-cy)>W||euler_state.px!==euler_state.px){
+      euler_state=mkOrbit();euler_state.trailE=[];
+    }
+
+    document.getElementById('verlet-timer').textContent=`t = ${elapsed.toFixed(1)}s`;
+    requestAnimationFrame(verletDemoFrame);
+  }
+  requestAnimationFrame(verletDemoFrame);
+}
+
+// ═══════════════ LAUNCH ═══════════════
+resizeSim();
+initStars();
+resetDemo();
+buildToolbar();
+buildCtxMenu();
+requestAnimationFrame(simFrame);
+</script>
+</body>
+</html>
