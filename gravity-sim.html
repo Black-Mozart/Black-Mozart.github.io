@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gravity Field Simulator</title>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --bg:#020408;--cyan:#00d4ff;--purple:#8040ff;
+  --magenta:#ff1a8c;--amber:#ffb84d;
+  --ff:'Rajdhani',sans-serif;--fm:'DM Mono',monospace;
+}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:#c8d6e8;}
+canvas{display:block;position:fixed;top:0;left:0;}
+
+#ui{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;font-family:var(--ff);}
+
+/* HUD top-left */
+#hud{
+  position:absolute;top:0;left:0;
+  background:rgba(2,4,8,0.75);backdrop-filter:blur(8px);
+  padding:12px 16px 10px;border-bottom-right-radius:8px;
+  border-right:1px solid rgba(0,212,255,0.15);
+  border-bottom:1px solid rgba(0,212,255,0.15);
+  max-width:calc(100% - 160px);
+}
+#hud h2{font-size:17px;font-weight:700;letter-spacing:3px;color:var(--cyan);margin-bottom:5px;text-transform:uppercase;}
+#hud .ctrl{font-family:var(--fm);font-size:10px;color:#5a7090;line-height:1.9;}
+#hud .ctrl b{color:#8a9ab8;}
+
+/* Status bar */
+#status{
+  position:absolute;top:96px;left:0;
+  background:rgba(2,4,8,0.65);padding:4px 14px;
+  font-family:var(--fm);font-size:10px;color:#7090b0;
+  border-bottom-right-radius:5px;
+  border-right:1px solid rgba(0,212,255,0.1);
+  border-bottom:1px solid rgba(0,212,255,0.1);
+}
+
+/* FPS */
+#fps{
+  position:absolute;top:8px;right:8px;
+  background:rgba(2,4,8,0.7);border:1px solid rgba(255,255,255,0.07);
+  font-family:var(--fm);font-size:18px;font-weight:500;
+  padding:4px 10px;border-radius:4px;
+}
+
+/* Spawn toolbar */
+#toolbar{
+  position:absolute;top:0;right:0;
+  width:130px;height:100%;
+  background:rgba(2,4,8,0.88);
+  border-left:1px solid rgba(0,212,255,0.12);
+  pointer-events:all;
+  display:flex;flex-direction:column;
+}
+.tb-btn{
+  flex:0 0 72px;cursor:pointer;
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:5px;
+  border-bottom:1px solid rgba(20,30,50,0.8);
+  position:relative;transition:background 0.15s;
+  user-select:none;
+}
+.tb-btn:hover{background:rgba(0,212,255,0.04);}
+.tb-btn.sel{background:rgba(0,212,255,0.07);}
+.tb-bar{position:absolute;left:0;top:0;width:3px;height:100%;display:none;}
+.tb-btn.sel .tb-bar{display:block;}
+.tb-ico{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;}
+.tb-lbl{font-size:10px;letter-spacing:2px;color:#4a6080;text-transform:uppercase;}
+.tb-btn.sel .tb-lbl{color:#c8d6e8;}
+.tb-hint{font-family:var(--fm);font-size:9px;color:rgba(60,80,110,0.7);}
+
+/* Info panel */
+#info{
+  position:absolute;bottom:14px;left:10px;
+  background:rgba(2,4,8,0.8);backdrop-filter:blur(8px);
+  border:1px solid rgba(0,212,255,0.2);border-radius:8px;
+  padding:12px 16px;min-width:260px;
+  font-family:var(--fm);font-size:11px;
+}
+#info .info-title{color:var(--cyan);letter-spacing:2px;font-size:10px;margin-bottom:6px;text-transform:uppercase;}
+#info .info-row{color:#5a7090;line-height:2;display:flex;justify-content:space-between;}
+#info .info-row span{color:#c8d6e8;}
+
+/* Paused */
+#paused{
+  position:absolute;top:8px;left:50%;transform:translateX(-50%);
+  background:rgba(2,4,8,0.8);color:#ff4455;
+  font-size:22px;font-weight:700;letter-spacing:4px;
+  padding:6px 24px;border-radius:4px;display:none;
+  border:1px solid rgba(255,68,85,0.4);
+}
+
+/* Legend */
+#legend{
+  position:absolute;bottom:14px;right:148px;
+  background:rgba(2,4,8,0.75);border:1px solid rgba(255,255,255,0.06);
+  border-radius:6px;padding:10px 14px;
+  font-family:var(--fm);font-size:10px;
+}
+#legend .leg-title{color:#3a5070;letter-spacing:2px;margin-bottom:8px;text-transform:uppercase;}
+.leg-item{display:flex;align-items:center;gap:8px;line-height:2;color:#5a7090;}
+.leg-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="ui">
+  <div id="hud">
+    <h2>⬡ Gravity Field Simulator</h2>
+    <div class="ctrl"><b>LMB drag</b>: spawn body &nbsp;·&nbsp; <b>RMB drag</b>: pan &nbsp;·&nbsp; <b>Scroll</b>: zoom &nbsp;·&nbsp; <b>Click body</b>: select</div>
+    <div class="ctrl"><b>SPACE</b>: pause &nbsp;·&nbsp; <b>C</b>: clear &nbsp;·&nbsp; <b>R</b>: reset &nbsp;·&nbsp; <b>T</b>: shoot test particle &nbsp;·&nbsp; <b>W</b>: toggle waves &nbsp;·&nbsp; <b>G</b>: grid detail</div>
+  </div>
+  <div id="status">Bodies: 0 · Zoom: 1.00x · Waves: ON</div>
+  <div id="fps" style="color:#3affa0">60 FPS</div>
+  <div id="paused">PAUSED</div>
+
+  <div id="toolbar">
+    <div class="tb-btn sel" data-mode="0">
+      <div class="tb-bar" style="background:#4af"></div>
+      <div class="tb-ico" style="background:rgba(40,120,255,0.25);border:2px solid #4af;color:#4af">P</div>
+      <div class="tb-lbl">Planet</div>
+      <div class="tb-hint">[1]</div>
+    </div>
+    <div class="tb-btn" data-mode="1">
+      <div class="tb-bar" style="background:#ffdc50"></div>
+      <div class="tb-ico" style="background:rgba(255,200,60,0.2);border:2px solid #ffdc50;color:#ffdc50">★</div>
+      <div class="tb-lbl">Star</div>
+      <div class="tb-hint">[2]</div>
+    </div>
+    <div class="tb-btn" data-mode="2">
+      <div class="tb-bar" style="background:#ff1a8c"></div>
+      <div class="tb-ico" style="background:rgba(140,20,80,0.3);border:2px solid #ff1a8c;position:relative;">
+        <div style="width:8px;height:8px;border-radius:50%;background:#000;position:absolute;z-index:1"></div>
+        <div style="width:22px;height:22px;border-radius:50%;background:rgba(255,26,140,0.15);position:absolute"></div>
+      </div>
+      <div class="tb-lbl">Singularity</div>
+      <div class="tb-hint">[3]</div>
+    </div>
+  </div>
+
+  <div id="info">
+    <div class="info-title">Field Stats</div>
+    <div class="info-row">Grid resolution <span id="i-grid">38 × 38</span></div>
+    <div class="info-row">Max curvature <span id="i-curv">0.0</span></div>
+    <div class="info-row">Active waves <span id="i-waves">0</span></div>
+    <div class="info-row">Test particles <span id="i-parts">0</span></div>
+  </div>
+
+  <div id="legend">
+    <div class="leg-title">Curvature</div>
+    <div class="leg-item"><div class="leg-dot" style="background:#0050ff"></div>Flat space</div>
+    <div class="leg-item"><div class="leg-dot" style="background:#8020ff"></div>Low curvature</div>
+    <div class="leg-item"><div class="leg-dot" style="background:#ff1a8c"></div>Deep well</div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ═══════════════ SETUP ═══════════════
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+let W = window.innerWidth, H = window.innerHeight;
+canvas.width=W; canvas.height=H;
+
+window.addEventListener('resize', ()=>{
+  W=window.innerWidth; H=window.innerHeight;
+  canvas.width=W; canvas.height=H;
+});
+
+// ═══════════════ CONSTANTS ═══════════════
+const GRID_N    = 38;
+const GRID_HALF = 310;
+const G_PHYS    = 60000;
+const G_VIS     = 1800;      // visual deformation scale
+const SOFT_PHYS = 18;
+const SOFT_VIS  = 30;
+const MAX_DEPTH = 180;
+const FOCAL     = 560;
+const CAM_RX    = 0.70;      // camera tilt (radians) — looking down
+const CAM_RY    = 0.18;      // slight horizontal rotation
+const MAX_BODIES = 12;
+const MAX_WAVES  = 20;
+const MAX_PARTS  = 80;
+const WAVE_SPEED = 260;
+
+// Grid precomputed world X/Z
+const GWX = new Float32Array(GRID_N * GRID_N);
+const GWZ = new Float32Array(GRID_N * GRID_N);
+const GWY = new Float32Array(GRID_N * GRID_N); // deformation (y = down in world)
+
+for(let i=0;i<GRID_N;i++) for(let j=0;j<GRID_N;j++){
+  const idx=i*GRID_N+j;
+  GWX[idx]=-GRID_HALF + j*(GRID_HALF*2/(GRID_N-1));
+  GWZ[idx]=-GRID_HALF + i*(GRID_HALF*2/(GRID_N-1));
+}
+
+// Screen projection cache
+const GSX = new Float32Array(GRID_N * GRID_N);
+const GSY = new Float32Array(GRID_N * GRID_N);
+const GSD = new Float32Array(GRID_N * GRID_N); // depth
+
+// ═══════════════ STATE ═══════════════
+let bodies = [];   // { wx,wz, vx,vz, ax,az, mass, radius, type, colR,colG,colB }
+let waves  = [];   // { wx,wz, r, life, maxLife, speed, strength }
+let parts  = [];   // test particles { wx,wz, vx,vz, trail[], life }
+
+let paused   = false;
+let showWaves= true;
+let gridDetail=1; // 1=full, 2=half, 3=quarter
+let spawnMode= 0;
+
+let camOffX=0, camOffY=0; // pan offset (world units)
+let camZoom =1.0;
+
+let rmbDown=false, rmbLast={x:0,y:0};
+let lmbDown=false, lmbPress={x:0,y:0}, lmbDist=0;
+let lastMX=0, lastMY=0;
+let selectedBody=-1;
+
+let flashAmt=0;
+let fpsSmooth=60, lastT=performance.now();
+
+// Spawn drag
+let spawning=false, spawnStart={x:0,y:0}, spawnNow={x:0,y:0};
+const CLICK_THRESH=8;
+
+// ═══════════════ SPAWN CONFIG ═══════════════
+const SPAWN_CFG=[
+  {mass:1200, radius:10, cr:100,cg:160,cb:255, name:'Planet'},
+  {mass:8000, radius:16, cr:255,cg:200,cb:60,  name:'Star'},
+  {mass:50000,radius:8,  cr:255,cg:26, cb:140, name:'Singularity'},
+];
+
+// ═══════════════ CAMERA MATH ═══════════════
+// Fixed camera angles, variable pan+zoom
+// World: X=right, Y=up (deformation), Z=forward
+// The grid is in XZ plane; masses push it downward (-Y)
+// Camera tilted to look at the grid from above-front
+
+const CRX_COS=Math.cos(CAM_RX), CRX_SIN=Math.sin(CAM_RX);
+const CRY_COS=Math.cos(CAM_RY), CRY_SIN=Math.sin(CAM_RY);
+
+function worldToScreen(wx, wy, wz){
+  // Apply pan and zoom
+  const tx=(wx-camOffX)*camZoom;
+  const tz=(wz-camOffY)*camZoom;
+  const ty=wy*camZoom;
+
+  // Rotate Y
+  const rx = tx*CRY_COS + tz*CRY_SIN;
+  const rz0=-tx*CRY_SIN + tz*CRY_COS;
+  // Rotate X
+  const ry = ty*CRX_COS - rz0*CRX_SIN;
+  const rz = ty*CRX_SIN + rz0*CRX_COS;
+
+  // Perspective
+  const depth=rz+680;
+  if(depth<10) return null;
+  const s=FOCAL/depth;
+  return{
+    sx:W/2+rx*s, sy:H*0.42+ry*s,
+    depth:rz, s, ry
+  };
+}
+
+// Screen → world flat (y=0): for body placement
+function screenToWorldFlat(sx, sy){
+  // Inverse perspective + inverse rotation for y=0
+  // Approximate: use the flat grid plane
+  // We iterate to find wx,wz such that worldToScreen(wx,0,wz)={sx,sy}
+  // Simple approach: invert the linear part at y=0
+  const depth=680;
+  const s=FOCAL/depth;
+  const rx=(sx-W/2)/s;
+  const ry_screen=(sy-H*0.42)/s;
+  // From ry = ry_screen and y=0: rz0 = -ry_screen / sin(CAM_RX)... 
+  // Simplified inverse (approximate):
+  const rz0=-ry_screen/CRX_SIN;
+  const tx_approx=(rx*CRY_COS - rz0*CRY_SIN);
+  const tz_approx=(rx*CRY_SIN + rz0*CRY_COS);
+  return{wx:tx_approx/camZoom+camOffX, wz:tz_approx/camZoom+camOffY};
+}
+
+// ═══════════════ GRID DEFORMATION ═══════════════
+function updateGrid(){
+  let maxC=0;
+  for(let k=0;k<GRID_N*GRID_N;k++){
+    const gx=GWX[k], gz=GWZ[k];
+    let dy=0;
+    for(let b=0;b<bodies.length;b++){
+      const dx=gx-bodies[b].wx, dz=gz-bodies[b].wz;
+      const d=Math.sqrt(dx*dx+dz*dz+SOFT_VIS*SOFT_VIS);
+      dy -= G_VIS*bodies[b].mass/(d*d+800);
+    }
+    // Add wave deformation
+    if(showWaves){
+      for(let w=0;w<waves.length;w++){
+        const dx=gx-waves[w].wx, dz=gz-waves[w].wz;
+        const d=Math.sqrt(dx*dx+dz*dz);
+        const dist=Math.abs(d-waves[w].r);
+        if(dist<30){
+          const wf=Math.cos(dist*0.2)*Math.exp(-dist*0.07)*waves[w].life*waves[w].strength;
+          dy+=wf*8;
+        }
+      }
+    }
+    GWY[k]=Math.max(-MAX_DEPTH, Math.min(20, dy));
+    if(Math.abs(GWY[k])>maxC) maxC=Math.abs(GWY[k]);
+  }
+  document.getElementById('i-curv').textContent=maxC.toFixed(1);
+}
+
+// Project all grid points
+function projectGrid(){
+  for(let k=0;k<GRID_N*GRID_N;k++){
+    const p=worldToScreen(GWX[k],-GWY[k]*0.5,GWZ[k]);
+    if(p){GSX[k]=p.sx;GSY[k]=p.sy;GSD[k]=p.depth;}
+    else{GSX[k]=-9999;GSY[k]=-9999;GSD[k]=9999;}
+  }
+}
+
+// ═══════════════ DEPTH COLOR ═══════════════
+function depthColor(wy){
+  // wy is deformation (negative = deeper)
+  const t=Math.min(1,Math.abs(wy)/MAX_DEPTH);
+  // Blue → Purple → Magenta
+  let r,g,b;
+  if(t<0.5){
+    const s=t*2;
+    r=(0+128*s)|0; g=(80-80*s)|0; b=(255)|0;
+  }else{
+    const s=(t-0.5)*2;
+    r=(128+127*s)|0; g=(0)|0; b=(255-165*s)|0;
+  }
+  return`rgb(${r},${g},${b})`;
+}
+
+function depthAlpha(wy){
+  return 0.25+0.55*Math.min(1,Math.abs(wy)/MAX_DEPTH);
+}
+
+// ═══════════════ DRAW GRID ═══════════════
+function drawGrid(){
+  const step=gridDetail;
+  for(let i=0;i<GRID_N-step;i+=step){
+    for(let j=0;j<GRID_N-step;j+=step){
+      const k =i*GRID_N+j;
+      const kr=i*GRID_N+(j+step);
+      const kd=(i+step)*GRID_N+j;
+      if(GSX[k]<-9000||GSX[kr]<-9000||GSX[kd]<-9000) continue;
+
+      const avgY=(GWY[k]+GWY[kr])*0.5;
+      const avgYv=(GWY[k]+GWY[kd])*0.5;
+      const col=depthColor(avgY), colv=depthColor(avgYv);
+      const alp=depthAlpha(avgY), alpv=depthAlpha(avgYv);
+
+      // Horizontal line
+      ctx.strokeStyle=col; ctx.globalAlpha=alp;
+      ctx.lineWidth=Math.max(0.4,1-GSD[k]/1200);
+      ctx.beginPath();ctx.moveTo(GSX[k],GSY[k]);ctx.lineTo(GSX[kr],GSY[kr]);ctx.stroke();
+
+      // Vertical line
+      ctx.strokeStyle=colv; ctx.globalAlpha=alpv;
+      ctx.lineWidth=Math.max(0.4,1-GSD[k]/1200);
+      ctx.beginPath();ctx.moveTo(GSX[k],GSY[k]);ctx.lineTo(GSX[kd],GSY[kd]);ctx.stroke();
+    }
+  }
+  ctx.globalAlpha=1;
+}
+
+// ═══════════════ PHYSICS ═══════════════
+const naX=[], naZ=[];
+
+function physicsStep(dt){
+  // Verlet step for bodies
+  const hh=0.5*dt*dt;
+  for(let i=0;i<bodies.length;i++){
+    bodies[i].wx+=bodies[i].vx*dt+bodies[i].ax*hh;
+    bodies[i].wz+=bodies[i].vz*dt+bodies[i].az*hh;
+  }
+  // New accelerations
+  for(let i=0;i<bodies.length;i++){
+    let ax=0,az=0;
+    for(let j=0;j<bodies.length;j++){
+      if(i===j)continue;
+      const dx=bodies[j].wx-bodies[i].wx;
+      const dz=bodies[j].wz-bodies[i].wz;
+      const d2=dx*dx+dz*dz+SOFT_PHYS*SOFT_PHYS;
+      const d=Math.sqrt(d2);
+      const am=G_PHYS*bodies[j].mass/d2;
+      ax+=dx/d*am; az+=dz/d*am;
+    }
+    naX[i]=ax; naZ[i]=az;
+  }
+  for(let i=0;i<bodies.length;i++){
+    bodies[i].vx+=0.5*(bodies[i].ax+naX[i])*dt;
+    bodies[i].vz+=0.5*(bodies[i].az+naZ[i])*dt;
+    bodies[i].ax=naX[i]; bodies[i].az=naZ[i];
+  }
+
+  // Collisions (simple merge)
+  for(let i=0;i<bodies.length;i++){
+    for(let j=i+1;j<bodies.length;j++){
+      const dx=bodies[j].wx-bodies[i].wx;
+      const dz=bodies[j].wz-bodies[i].wz;
+      const r=bodies[i].radius+bodies[j].radius;
+      if(dx*dx+dz*dz<r*r){
+        const m=bodies[i].mass+bodies[j].mass;
+        const cvx=(bodies[i].vx*bodies[i].mass+bodies[j].vx*bodies[j].mass)/m;
+        const cvz=(bodies[i].vz*bodies[i].mass+bodies[j].vz*bodies[j].mass)/m;
+        const cpx=(bodies[i].wx*bodies[i].mass+bodies[j].wx*bodies[j].mass)/m;
+        const cpz=(bodies[i].wz*bodies[i].mass+bodies[j].wz*bodies[j].mass)/m;
+        // Shockwave
+        addWave(cpx,cpz,Math.sqrt((bodies[i].vx-bodies[j].vx)**2+(bodies[i].vz-bodies[j].vz)**2)*0.3+0.5);
+        flashAmt=0.6;
+        bodies[i]={...bodies[i],wx:cpx,wz:cpz,vx:cvx,vz:cvz,mass:m,
+          radius:Math.min(30,bodies[i].radius*1.2),
+          type:m>20000?2:m>8000?1:0,
+          cr:(bodies[i].cr+bodies[j].cr)/2|0,
+          cg:(bodies[i].cg+bodies[j].cg)/2|0,
+          cb:(bodies[i].cb+bodies[j].cb)/2|0,
+          ax:0,az:0};
+        bodies.splice(j,1);j--;
+      }
+    }
+  }
+
+  // Test particles
+  for(let p=0;p<parts.length;p++){
+    const pt=parts[p];
+    // Force from bodies
+    let ax=0,az=0;
+    for(let b=0;b<bodies.length;b++){
+      const dx=bodies[b].wx-pt.wx;
+      const dz=bodies[b].wz-pt.wz;
+      const d2=dx*dx+dz*dz+SOFT_PHYS*SOFT_PHYS;
+      const d=Math.sqrt(d2);
+      const am=G_PHYS*bodies[b].mass/d2;
+      ax+=dx/d*am; az+=dz/d*am;
+    }
+    pt.vx+=ax*dt; pt.vz+=az*dt;
+    pt.wx+=pt.vx*dt; pt.wz+=pt.vz*dt;
+    pt.trail.push({wx:pt.wx,wz:pt.wz});
+    if(pt.trail.length>60) pt.trail.shift();
+    pt.life-=dt*0.25;
+    // Check absorbed by body
+    for(let b=0;b<bodies.length;b++){
+      const dx=pt.wx-bodies[b].wx, dz=pt.wz-bodies[b].wz;
+      if(dx*dx+dz*dz<(bodies[b].radius+4)**2){pt.life=0;break;}
+    }
+  }
+  parts=parts.filter(p=>p.life>0&&Math.abs(p.wx)<1200&&Math.abs(p.wz)<1200);
+
+  // Waves
+  for(let w=0;w<waves.length;w++){
+    waves[w].r+=waves[w].speed*dt;
+    waves[w].life-=dt*0.35;
+  }
+  waves=waves.filter(w=>w.life>0&&w.r<800);
+}
+
+function addWave(wx,wz,strength){
+  if(waves.length<MAX_WAVES) waves.push({wx,wz,r:0,life:1,maxLife:1,speed:WAVE_SPEED,strength:Math.min(2,strength)});
+}
+
+// ═══════════════ DRAW BODIES ═══════════════
+function drawBodies(){
+  // Sort by depth
+  const sorted=[...bodies].map((b,i)=>{
+    const p=worldToScreen(b.wx,0,b.wz);
+    return{b,p,i};
+  }).filter(x=>x.p).sort((a,z)=>z.p.depth-a.p.depth);
+
+  for(const {b,p,i: idx} of sorted){
+    const {sx,sy,s}=p;
+    const sr=b.radius*s*2.5;
+
+    if(b.type===2){
+      // Singularity: deep magenta ring + black core
+      for(let g=5;g>=1;g--){
+        ctx.globalAlpha=0.06*g;
+        ctx.fillStyle=`rgba(255,26,140,1)`;
+        ctx.beginPath();ctx.arc(sx,sy,sr+g*12,0,Math.PI*2);ctx.fill();
+      }
+      ctx.globalAlpha=1;
+      ctx.fillStyle='#000';
+      ctx.beginPath();ctx.arc(sx,sy,sr*0.7,0,Math.PI*2);ctx.fill();
+      // Accretion ring
+      ctx.strokeStyle='rgba(255,26,140,0.6)';
+      ctx.lineWidth=2;
+      ctx.beginPath();ctx.ellipse(sx,sy,sr*1.4,sr*0.4,0.3,0,Math.PI*2);ctx.stroke();
+    } else {
+      // Planet/Star
+      for(let g=5;g>=1;g--){
+        ctx.globalAlpha=0.07*g;
+        ctx.fillStyle=`rgb(${b.cr},${b.cg},${b.cb})`;
+        ctx.beginPath();ctx.arc(sx,sy,sr+g*8,0,Math.PI*2);ctx.fill();
+      }
+      ctx.globalAlpha=1;
+      const grd=ctx.createRadialGradient(sx-sr*0.3,sy-sr*0.3,0,sx,sy,sr);
+      grd.addColorStop(0,`rgb(${Math.min(255,b.cr+80)},${Math.min(255,b.cg+80)},${Math.min(255,b.cb+80)})`);
+      grd.addColorStop(1,`rgb(${b.cr},${b.cg},${b.cb})`);
+      ctx.fillStyle=grd;
+      ctx.beginPath();ctx.arc(sx,sy,sr,0,Math.PI*2);ctx.fill();
+    }
+
+    // Selection ring
+    if(idx===selectedBody){
+      ctx.strokeStyle='rgba(255,184,77,0.8)';
+      ctx.lineWidth=2;
+      ctx.setLineDash([4,4]);
+      ctx.beginPath();ctx.arc(sx,sy,sr+8,0,Math.PI*2);ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+  ctx.globalAlpha=1;
+}
+
+// ═══════════════ DRAW WAVES ═══════════════
+function drawWaves(){
+  for(const w of waves){
+    const p=worldToScreen(w.wx,0,w.wz);
+    if(!p) continue;
+    const alpha=w.life*0.35;
+    ctx.strokeStyle=`rgba(0,180,255,${alpha.toFixed(2)})`;
+    ctx.lineWidth=2;
+    // Ellipse to represent 3D ring on the mesh plane
+    const sx=p.sx, sy=p.sy;
+    const rScr=w.r*p.s*camZoom;
+    ctx.beginPath();
+    ctx.ellipse(sx,sy,rScr,rScr*0.4,CAM_RY,0,Math.PI*2);
+    ctx.stroke();
+  }
+}
+
+// ═══════════════ DRAW PARTICLES ═══════════════
+function drawParticles(){
+  for(const pt of parts){
+    if(pt.trail.length<2) continue;
+    for(let i=1;i<pt.trail.length;i++){
+      const p0=worldToScreen(pt.trail[i-1].wx,0,pt.trail[i-1].wz);
+      const p1=worldToScreen(pt.trail[i].wx,0,pt.trail[i].wz);
+      if(!p0||!p1) continue;
+      const a=(i/pt.trail.length)*pt.life*0.8;
+      ctx.strokeStyle=`rgba(200,255,255,${a.toFixed(2)})`;
+      ctx.lineWidth=1.5;
+      ctx.beginPath();ctx.moveTo(p0.sx,p0.sy);ctx.lineTo(p1.sx,p1.sy);ctx.stroke();
+    }
+    // Head dot
+    const ph=worldToScreen(pt.wx,0,pt.wz);
+    if(ph){
+      ctx.fillStyle=`rgba(255,255,255,${pt.life.toFixed(2)})`;
+      ctx.beginPath();ctx.arc(ph.sx,ph.sy,3,0,Math.PI*2);ctx.fill();
+    }
+  }
+}
+
+// ═══════════════ DRAW SPAWN ARROW ═══════════════
+function drawSpawnPreview(){
+  if(!spawning||lmbDist<CLICK_THRESH) return;
+  const sw=screenToWorldFlat(lmbPress.x,lmbPress.y);
+  const ew=screenToWorldFlat(lastMX,lastMY);
+  const p0=worldToScreen(sw.wx,0,sw.wz);
+  const p1=worldToScreen(ew.wx,0,ew.wz);
+  if(!p0||!p1) return;
+  ctx.strokeStyle='rgba(255,68,85,0.8)';ctx.lineWidth=2;
+  ctx.beginPath();ctx.moveTo(p0.sx,p0.sy);ctx.lineTo(p1.sx,p1.sy);ctx.stroke();
+  ctx.fillStyle='rgba(255,255,255,0.9)';
+  ctx.beginPath();ctx.arc(p0.sx,p0.sy,4,0,Math.PI*2);ctx.fill();
+}
+
+// ═══════════════ BACKGROUND ═══════════════
+function drawBG(){
+  ctx.fillStyle='#020408';
+  ctx.fillRect(0,0,W,H);
+  // Faint radial center glow
+  const grd=ctx.createRadialGradient(W/2,H*0.42,0,W/2,H*0.42,400);
+  grd.addColorStop(0,'rgba(0,40,120,0.15)');
+  grd.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=grd;ctx.fillRect(0,0,W,H);
+}
+
+// ═══════════════ RESET ═══════════════
+function resetDemo(){
+  bodies=[];waves=[];parts=[];
+  // Two orbiting stars
+  bodies.push({wx:-120,wz:0,vx:0,vz:95,ax:0,az:0,mass:6000,radius:14,type:1,cr:255,cg:200,cb:60});
+  bodies.push({wx:120,wz:0,vx:0,vz:-95,ax:0,az:0,mass:6000,radius:14,type:1,cr:255,cg:160,cb:80});
+  // Planet
+  bodies.push({wx:0,wz:220,vx:-75,vz:0,ax:0,az:0,mass:800,radius:8,type:0,cr:80,cg:160,cb:255});
+}
+
+function spawnBody(mode,wx,wz,vx,vz){
+  if(bodies.length>=MAX_BODIES) return;
+  const cfg=SPAWN_CFG[mode];
+  bodies.push({wx,wz,vx,vz,ax:0,az:0,
+    mass:cfg.mass*(0.6+Math.random()*0.8),
+    radius:cfg.radius,type:mode,
+    cr:cfg.cr,cg:cfg.cg,cb:cfg.cb});
+}
+
+// ═══════════════ HUD UPDATE ═══════════════
+function updateHUD(dt){
+  const fps=fpsSmooth+0.5|0;
+  const fe=document.getElementById('fps');
+  fe.textContent=fps+' FPS';
+  fe.style.color=fps>=55?'#3affa0':fps>=30?'#ffb84d':'#ff5566';
+
+  let np=0,nw=waves.length,nr=parts.length;
+  for(const b of bodies) if(b.mass>0) np++;
+  document.getElementById('status').textContent=
+    `Bodies: ${np} · Zoom: ${camZoom.toFixed(2)}x · Waves: ${showWaves?'ON':'OFF'}`;
+  document.getElementById('i-waves').textContent=nw;
+  document.getElementById('i-parts').textContent=nr;
+  document.getElementById('paused').style.display=paused?'block':'none';
+  document.querySelectorAll('.tb-btn').forEach((b,i)=>b.classList.toggle('sel',i===spawnMode));
+}
+
+// ═══════════════ RENDER LOOP ═══════════════
+function frame(now){
+  const dt=Math.min((now-lastT)/1000,0.05); lastT=now;
+  const iFPS=dt>0?1/dt:60; fpsSmooth+=(iFPS-fpsSmooth)*(dt/0.5);
+  flashAmt=Math.max(0,flashAmt-dt*1.5);
+
+  if(!paused){
+    physicsStep(dt);
+    updateGrid();
+  }
+  projectGrid();
+
+  drawBG();
+
+  // Flash
+  if(flashAmt>0){
+    ctx.fillStyle=`rgba(200,160,255,${(flashAmt*0.3).toFixed(2)})`;
+    ctx.fillRect(0,0,W,H);
+  }
+
+  drawGrid();
+  if(showWaves) drawWaves();
+  drawBodies();
+  drawParticles();
+  drawSpawnPreview();
+
+  updateHUD(dt);
+  requestAnimationFrame(frame);
+}
+
+// ═══════════════ INPUT ═══════════════
+const keys={};
+window.addEventListener('keydown',e=>{
+  keys[e.key.toLowerCase()]=true;
+  const k=e.key.toLowerCase();
+  if(k===' '){paused=!paused;e.preventDefault();}
+  else if(k==='c'){bodies=[];waves=[];parts=[];}
+  else if(k==='r') resetDemo();
+  else if(k==='w') showWaves=!showWaves;
+  else if(k==='g'){gridDetail=gridDetail===1?2:gridDetail===2?3:1;document.getElementById('i-grid').textContent=`${GRID_N/gridDetail|0} × ${GRID_N/gridDetail|0}`;}
+  else if(k==='t') shootParticle();
+  else if(k==='1') spawnMode=0;
+  else if(k==='2') spawnMode=1;
+  else if(k==='3') spawnMode=2;
+});
+window.addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=false;});
+
+function shootParticle(){
+  // Shoot from cursor position with velocity toward screen center
+  const wp=screenToWorldFlat(lastMX,lastMY);
+  const cx2=screenToWorldFlat(W/2,H/2);
+  const dx=cx2.wx-wp.wx, dz=cx2.wz-wp.wz;
+  const d=Math.sqrt(dx*dx+dz*dz)+1;
+  const spd=350;
+  parts.push({wx:wp.wx,wz:wp.wz,vx:dx/d*spd,vz:dz/d*spd,trail:[],life:1});
+  if(parts.length>MAX_PARTS) parts.shift();
+}
+
+canvas.addEventListener('mousemove',e=>{
+  lastMX=e.clientX; lastMY=e.clientY;
+  if(rmbDown){
+    // Pan: invert the screen→world transform approximately
+    const dsx=e.movementX, dsy=e.movementY;
+    // Pan in the flat grid plane
+    camOffX -= dsx/(camZoom*CRY_COS*FOCAL/680)*1.8;
+    camOffY -= (dsy/(camZoom*CRX_SIN*FOCAL/680))*1.2;
+  }
+  if(lmbDown){
+    const ds=Math.hypot(e.clientX-lmbPress.x,e.clientY-lmbPress.y);
+    lmbDist=ds;
+    spawnNow=screenToWorldFlat(e.clientX,e.clientY);
+  }
+});
+
+canvas.addEventListener('mousedown',e=>{
+  if(e.button===0){
+    if(e.clientX>W-130) return;
+    lmbPress={x:e.clientX,y:e.clientY};
+    lmbDist=0; lmbDown=true;
+    spawning=true;
+    spawnStart=screenToWorldFlat(e.clientX,e.clientY);
+    spawnNow={...spawnStart};
+  }
+  if(e.button===2){rmbDown=true;rmbLast={x:e.clientX,y:e.clientY};}
+});
+
+canvas.addEventListener('mouseup',e=>{
+  if(e.button===0&&spawning){
+    spawning=false; lmbDown=false;
+    if(lmbDist<CLICK_THRESH){
+      // Try select body
+      const wp=screenToWorldFlat(lmbPress.x,lmbPress.y);
+      let best=-1,bd=1e18;
+      for(let i=0;i<bodies.length;i++){
+        const d2=(bodies[i].wx-wp.wx)**2+(bodies[i].wz-wp.wz)**2;
+        if(d2<(bodies[i].radius*3)**2&&d2<bd){bd=d2;best=i;}
+      }
+      selectedBody=best;
+    } else {
+      const vscale=1.8;
+      const vx=(spawnStart.wx-spawnNow.wx)*vscale;
+      const vz=(spawnStart.wz-spawnNow.wz)*vscale;
+      spawnBody(spawnMode,spawnStart.wx,spawnStart.wz,vx,vz);
+      addWave(spawnStart.wx,spawnStart.wz,0.4);
+    }
+  }
+  if(e.button===2) rmbDown=false;
+});
+
+canvas.addEventListener('wheel',e=>{
+  e.preventDefault();
+  const delta=e.deltaY<0?1:-1;
+  camZoom=Math.max(0.2,Math.min(5,camZoom+delta*0.12*camZoom));
+},{passive:false});
+
+canvas.addEventListener('contextmenu',e=>e.preventDefault());
+
+document.querySelectorAll('.tb-btn').forEach((btn,i)=>{
+  btn.addEventListener('click',()=>{spawnMode=i;});
+});
+
+// ═══════════════ INIT ═══════════════
+resetDemo();
+updateGrid();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
