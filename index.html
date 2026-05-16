@@ -618,74 +618,62 @@ nav.scrolled{
       </div>
     </div>
 
-    <!-- ═══ PROJECT 2: PLACEHOLDER — EDIT THIS ═══ -->
-    <!--
-      ✏️  HOW TO ADD A REAL PROJECT:
-      1. Change class "status-soon" → "status-live" (or "status-wip" for work-in-progress)
-      2. Update the card-title, card-desc, card-tags
-      3. Change <a class="card-link soon"> → <a class="card-link live" href="YOUR_URL" target="_blank">
-      4. Remove "cursor:not-allowed" from the link
-      5. Replace the preview-placeholder icon with a <canvas> mini preview or screenshot <img>
-    -->
+    <!-- ═══ PROJECT 2: GRAVITY FIELD SIMULATOR ═══ -->
     <div class="project-card reveal" style="--card-accent:#5b8eff;">
       <div class="card-preview">
-        <div class="preview-placeholder">
-          <span class="ph-icon">〜</span>
-          <span class="ph-text">Preview coming</span>
-        </div>
+        <canvas id="gravity-preview" style="width:100%;height:100%;display:block;background:#020408;"></canvas>
+        <div class="preview-overlay"></div>
       </div>
       <div class="card-body">
         <div class="card-meta">
           <span class="card-index">002</span>
-          <!-- ✏️  Change to status-live or status-wip when ready -->
-          <span class="card-status status-soon">Coming Soon</span>
+          <span class="card-status status-live">● Live</span>
         </div>
-        <!-- ✏️  EDIT: Replace with your project name -->
-        <div class="card-title">Your Next Project</div>
-        <!-- ✏️  EDIT: Replace with your project description -->
+        <div class="card-title">Gravity Field Simulator</div>
         <div class="card-desc">
-          Describe your interactive project here. What does it do? What makes it interesting? Keep it to 2–3 sentences.
+          Einstein's rubber sheet — a real-time 3D space-time curvature mesh that bends toward every mass. Spawn planets, stars and singularities, shoot test particles along geodesics, and trigger gravitational wave ripples.
         </div>
         <div class="card-tags">
-          <!-- ✏️  EDIT: Replace with relevant tech tags -->
-          <span class="tag">WebGL</span>
-          <span class="tag">Simulation</span>
-          <span class="tag">Canvas</span>
+          <span class="tag">General Relativity</span>
+          <span class="tag">Space-Time Mesh</span>
+          <span class="tag">3D Projection</span>
+          <span class="tag">N-body</span>
         </div>
         <div class="card-footer">
-          <!-- ✏️  EDIT: Add href and change class to "card-link live" when deployed -->
-          <a href="#" class="card-link soon">In Progress</a>
-          <!-- ✏️  EDIT: Your tech stack -->
+          <a href="https://Black-Mozart.github.io/gravity-sim" class="card-link live" target="_blank">
+            Launch Demo <span class="arr">↗</span>
+          </a>
           <span class="card-stack">Vanilla JS</span>
         </div>
       </div>
     </div>
 
-    <!-- ═══ PROJECT 3: PLACEHOLDER ═══ -->
+    <!-- ═══ PROJECT 3: QUANTUM ATOM SIMULATOR ═══ -->
     <div class="project-card reveal" style="--card-accent:#ff6b35;">
       <div class="card-preview">
-        <div class="preview-placeholder">
-          <span class="ph-icon">◎</span>
-          <span class="ph-text">Preview coming</span>
-        </div>
+        <canvas id="atom-preview" style="width:100%;height:100%;display:block;background:#02040a;"></canvas>
+        <div class="preview-overlay"></div>
       </div>
       <div class="card-body">
         <div class="card-meta">
           <span class="card-index">003</span>
-          <span class="card-status status-soon">Coming Soon</span>
+          <span class="card-status status-live">● Live</span>
         </div>
-        <!-- ✏️  EDIT -->
-        <div class="card-title">Your Next Project</div>
+        <div class="card-title">Quantum Atom Simulator</div>
         <div class="card-desc">
-          Another interactive experiment. Fluid simulation, cellular automata, audio visualizer, generative art — whatever you're building next.
+          Interactive 3D quantum mechanical atom. Drag to rotate, browse 36 elements, toggle between Bohr orbits, probability density clouds and orbital shapes. Click electrons to excite them and watch emission spectra appear.
         </div>
         <div class="card-tags">
-          <span class="tag">WebGL</span>
-          <span class="tag">Generative</span>
+          <span class="tag">Quantum Mechanics</span>
+          <span class="tag">3D Orbitals</span>
+          <span class="tag">Emission Spectra</span>
+          <span class="tag">36 Elements</span>
         </div>
         <div class="card-footer">
-          <a href="#" class="card-link soon">In Progress</a>
-          <span class="card-stack">GLSL</span>
+          <a href="https://Black-Mozart.github.io/atom-sim" class="card-link live" target="_blank">
+            Launch Demo <span class="arr">↗</span>
+          </a>
+          <span class="card-stack">Vanilla JS</span>
         </div>
       </div>
     </div>
@@ -937,6 +925,40 @@ sObs.observe(statEl);
   }
 
   initBodies();
+  loop(performance.now());
+})();
+
+// GRAVITY PREVIEW
+(function(){
+  var canvas=document.getElementById('gravity-preview');
+  if(!canvas)return;
+  var ctx=canvas.getContext('2d');
+  var GN=20,GH=85,FOCAL=280;
+  var CRX=Math.cos(0.68),SRX=Math.sin(0.68),CRY=Math.cos(0.2),SRY=Math.sin(0.2);
+  var gwx=new Float32Array(GN*GN),gwz=new Float32Array(GN*GN);
+  for(var i=0;i<GN;i++)for(var j=0;j<GN;j++){gwx[i*GN+j]=-GH+j*(GH*2/(GN-1));gwz[i*GN+j]=-GH+i*(GH*2/(GN-1));}
+  var bodies=[{wx:0,wz:0,vx:0,vz:0,ax:0,az:0,mass:18000},{wx:52,wz:0,vx:0,vz:50,ax:0,az:0,mass:400},{wx:-38,wz:0,vx:0,vz:-60,ax:0,az:0,mass:280}];
+  function w2s(wx,wy,wz,W,H){var rx=wx*CRY+wz*SRY,rz0=-wx*SRY+wz*CRY,ry=wy*CRX-rz0*SRX,rz=wy*SRX+rz0*CRX,d=rz+340;if(d<5)return null;var s=FOCAL/d;return{sx:W/2+rx*s,sy:H*0.42+ry*s,depth:rz,s:s};}
+  function dCol(wy){var t=Math.min(1,Math.abs(wy)/100);if(t<0.5){var s=t*2;return'rgb('+(s*100|0)+','+(80-80*s|0)+',255)';}var s=(t-0.5)*2;return'rgb('+(100+155*s|0)+',0,'+(255-165*s|0)+')';}
+  var lt=performance.now();
+  function step(dt){var hh=0.5*dt*dt;bodies.forEach(function(b){b.wx+=b.vx*dt+b.ax*hh;b.wz+=b.vz*dt+b.az*hh;});var na=bodies.map(function(_,i){var ax=0,az=0;bodies.forEach(function(_,j){if(i===j)return;var dx=bodies[j].wx-bodies[i].wx,dz=bodies[j].wz-bodies[i].wz,d2=dx*dx+dz*dz+80,d=Math.sqrt(d2),a=35000*bodies[j].mass/d2;ax+=dx/d*a;az+=dz/d*a;});return{ax:ax,az:az};});bodies.forEach(function(b,i){b.vx+=0.5*(b.ax+na[i].ax)*dt;b.vz+=0.5*(b.az+na[i].az)*dt;b.ax=na[i].ax;b.az=na[i].az;});}
+  function draw(){var W=canvas.offsetWidth||300,H=canvas.offsetHeight||200;if(canvas.width!==W||canvas.height!==H){canvas.width=W;canvas.height=H;}ctx.fillStyle='#020408';ctx.fillRect(0,0,W,H);var gwy=new Float32Array(GN*GN);for(var k=0;k<GN*GN;k++){var dy=0;bodies.forEach(function(b){var dx=gwx[k]-b.wx,dz=gwz[k]-b.wz,d=Math.sqrt(dx*dx+dz*dz+300);dy-=500*b.mass/(d*d+150);});gwy[k]=Math.max(-75,dy);}var gsx=new Float32Array(GN*GN),gsy_arr=new Float32Array(GN*GN);for(var k=0;k<GN*GN;k++){var p=w2s(gwx[k],-gwy[k]*0.4,gwz[k],W,H);if(p){gsx[k]=p.sx;gsy_arr[k]=p.sy;}else{gsx[k]=-9999;}}for(var ii=0;ii<GN-2;ii+=2)for(var jj=0;jj<GN-2;jj+=2){var k=ii*GN+jj,kr=ii*GN+jj+2,kd=(ii+2)*GN+jj;if(gsx[k]<-9000||gsx[kr]<-9000||gsx[kd]<-9000)continue;ctx.strokeStyle=dCol((gwy[k]+gwy[kr])/2);ctx.globalAlpha=0.4;ctx.lineWidth=0.8;ctx.beginPath();ctx.moveTo(gsx[k],gsy_arr[k]);ctx.lineTo(gsx[kr],gsy_arr[kr]);ctx.stroke();ctx.strokeStyle=dCol((gwy[k]+gwy[kd])/2);ctx.beginPath();ctx.moveTo(gsx[k],gsy_arr[k]);ctx.lineTo(gsx[kd],gsy_arr[kd]);ctx.stroke();}ctx.globalAlpha=1;bodies.forEach(function(b,idx){var p=w2s(b.wx,0,b.wz,W,H);if(!p)return;var sr=Math.max(2,(idx===0?7:3.5)*p.s*2.2);ctx.globalAlpha=0.12;ctx.fillStyle=idx===0?'#ffdc50':'#4af';ctx.beginPath();ctx.arc(p.sx,p.sy,sr*3,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;ctx.fillStyle=idx===0?'#ffdc50':'#4af';ctx.beginPath();ctx.arc(p.sx,p.sy,sr,0,Math.PI*2);ctx.fill();});ctx.globalAlpha=1;}
+  function loop(now){var dt=Math.min((now-lt)/1000,0.05);lt=now;if(canvas.offsetParent!==null&&canvas.offsetWidth>10){step(dt);draw();}requestAnimationFrame(loop);}
+  loop(performance.now());
+})();
+
+// ATOM PREVIEW
+(function(){
+  var canvas=document.getElementById('atom-preview');
+  if(!canvas)return;
+  var ctx=canvas.getContext('2d');
+  var rotY=0.5,rotX=-0.3,t=0;
+  var shells=[{r:26,n:2,col:'#00d4ff'},{r:50,n:8,col:'#a060ff'},{r:74,n:8,col:'#00ffc8'}];
+  function proj(x,y,z,W,H){var x1=x*Math.cos(rotY)+z*Math.sin(rotY),z1=-x*Math.sin(rotY)+z*Math.cos(rotY),y2=y*Math.cos(rotX)-z1*Math.sin(rotX),z2=y*Math.sin(rotX)+z1*Math.cos(rotX),d=z2+380;if(d<5)return null;var s=260/d;return{sx:W/2+x1*s,sy:H/2+y2*s,s:s,depth:z2};}
+  var electrons=[];shells.forEach(function(sh,si){for(var e=0;e<sh.n;e++){electrons.push({sh:sh,angle:e/sh.n*Math.PI*2,speed:(0.6+Math.random()*0.4)/(si+1),tT:e*Math.PI/sh.n,tP:si*0.9+e*0.7});}});
+  var cloudPts=[];for(var i=0;i<500;i++){var r=15+Math.random()*85,tt=Math.acos(2*Math.random()-1),pp=Math.random()*Math.PI*2,prob=Math.exp(-r/45)*r*r*0.0008;if(Math.random()<prob*10)cloudPts.push({x:r*Math.sin(tt)*Math.cos(pp),y:r*Math.sin(tt)*Math.sin(pp),z:r*Math.cos(tt)});}
+  var lt=performance.now();
+  function loop(now){var dt=Math.min((now-lt)/1000,0.04);lt=now;t+=dt;rotY+=dt*0.22;var W=canvas.offsetWidth||300,H=canvas.offsetHeight||200;if(canvas.width!==W||canvas.height!==H){canvas.width=W;canvas.height=H;}ctx.fillStyle='rgba(2,4,10,0.28)';ctx.fillRect(0,0,W,H);for(var i=0;i<10;i++){var a=i*0.63,px=Math.cos(a)*4,pz=Math.sin(a)*4,p=proj(px,0,pz,W,H);if(!p)continue;ctx.fillStyle=i<6?'#ff4455':'#6080a0';ctx.globalAlpha=0.9;ctx.beginPath();ctx.arc(p.sx,p.sy,Math.max(1.2,1.8*p.s),0,Math.PI*2);ctx.fill();}ctx.globalAlpha=1;cloudPts.forEach(function(pt){var p=proj(pt.x,pt.y,pt.z,W,H);if(!p)return;ctx.globalAlpha=(0.12+0.18*p.s)*0.8;ctx.fillStyle='#00d4ff';ctx.beginPath();ctx.arc(p.sx,p.sy,Math.max(0.4,0.8*p.s),0,Math.PI*2);ctx.fill();});ctx.globalAlpha=1;electrons.forEach(function(e){var ang=e.angle+t*e.speed,lx=e.sh.r*Math.cos(ang),lz=e.sh.r*Math.sin(ang),ct=Math.cos(e.tT),st=Math.sin(e.tT),cp=Math.cos(e.tP),sp=Math.sin(e.tP),ex=lx*cp-lz*st*sp,ey=lx*sp+lz*st*cp,ez=lz*ct,p=proj(ex,ey,ez,W,H);if(!p)return;var r=Math.max(1.2,2*p.s);ctx.globalAlpha=0.18;ctx.fillStyle=e.sh.col;ctx.beginPath();ctx.arc(p.sx,p.sy,r*4,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;ctx.fillStyle=e.sh.col;ctx.beginPath();ctx.arc(p.sx,p.sy,r,0,Math.PI*2);ctx.fill();});ctx.globalAlpha=1;if(canvas.offsetParent!==null)requestAnimationFrame(loop);}
   loop(performance.now());
 })();
 </script>
