@@ -4,733 +4,981 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Quantum Atom Simulator</title>
-<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;1,8..60,300&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" crossorigin="anonymous">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" crossorigin="anonymous"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" crossorigin="anonymous" onload="katexReady=true;tryRenderMath();"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
 :root{
-  --bg:#02040a;--panel:#080c18;
-  --cyan:#00d4ff;--teal:#00ffc8;
-  --proton:#ff4455;--neutron:#6080a0;
-  --amber:#ffb84d;--purple:#a060ff;
-  --ff:'Rajdhani',sans-serif;--fm:'DM Mono',monospace;
+  --bg:#02040a;--bg2:#04080f;--bg3:#070e1c;--bg4:#0b1828;
+  --cyan:#00d4ff;--teal:#00ffc8;--pur:#a060ff;--amb:#ffb84d;--grn:#3affa0;--red:#ff5566;
+  --pro:#ff4455;--neu:#5a7898;
+  --text:#c8d6e8;--mid:#506070;--dim:#2a3a50;--bdr:rgba(0,212,255,0.12);
+  --nav-h:52px;
+  --ff:'Rajdhani',sans-serif;--fb:'Source Serif 4',serif;--fm:'DM Mono',monospace;
 }
-html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:#c8d6e8;}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:var(--fb);}
 
-/* Layout: canvas left, panel right */
-#layout{display:flex;width:100%;height:100%;}
-#canvas-wrap{flex:1;position:relative;overflow:hidden;}
-canvas{display:block;width:100%;height:100%;}
+/* NAV */
+nav{position:fixed;top:0;left:0;right:0;height:var(--nav-h);z-index:300;
+  background:rgba(2,4,10,0.95);border-bottom:1px solid var(--bdr);
+  backdrop-filter:blur(12px);display:flex;align-items:center;padding:0 18px;gap:12px;}
+.nlogo{font-family:var(--ff);font-size:15px;font-weight:700;letter-spacing:3px;
+  color:var(--cyan);display:flex;align-items:center;gap:8px;margin-right:auto;}
+.ndot{width:7px;height:7px;border-radius:50%;background:var(--cyan);
+  animation:dot 2.5s ease-in-out infinite;}
+@keyframes dot{0%,100%{opacity:1;transform:scale(1);}50%{opacity:0.4;transform:scale(0.65);}}
+.tabs{display:flex;gap:2px;background:rgba(0,0,0,0.4);border:1px solid var(--bdr);
+  border-radius:7px;padding:3px;}
+.tab{font-family:var(--fm);font-size:11px;letter-spacing:2px;background:none;
+  border:none;color:var(--mid);cursor:pointer;padding:5px 15px;border-radius:5px;
+  transition:all .2s;text-transform:uppercase;}
+.tab:hover{color:var(--text);background:rgba(0,212,255,0.06);}
+.tab.on{background:rgba(0,212,255,0.1);color:var(--cyan);border:1px solid rgba(0,212,255,0.25);}
+.nbadge{margin-left:auto;font-family:var(--fm);font-size:9px;color:var(--dim);
+  background:rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.05);
+  padding:3px 8px;border-radius:4px;letter-spacing:1px;}
 
-/* Right panel */
-#panel{
-  width:240px;flex-shrink:0;
-  background:var(--panel);
-  border-left:1px solid rgba(0,212,255,0.12);
-  display:flex;flex-direction:column;
-  overflow-y:auto;
-  scrollbar-width:thin;scrollbar-color:rgba(0,80,120,0.5) transparent;
-}
-#panel::-webkit-scrollbar{width:4px;}
-#panel::-webkit-scrollbar-thumb{background:rgba(0,80,120,0.5);}
+/* PANELS */
+.panel{position:fixed;top:var(--nav-h);left:0;right:0;bottom:0;display:none;}
+.panel.on{display:block;}
 
-.panel-section{
-  padding:14px 16px;
-  border-bottom:1px solid rgba(0,212,255,0.08);
-}
-.pst{
-  font-family:var(--fm);font-size:9px;letter-spacing:3px;
-  text-transform:uppercase;color:#3a6080;margin-bottom:10px;
-  display:flex;align-items:center;gap:8px;
-}
-.pst::after{content:'';flex:1;height:1px;background:rgba(0,212,255,0.1);}
+/* ══ SIMULATE ══ */
+#psim{background:var(--bg);}
+
+/* Layout: canvas + side panel */
+#simlayout{display:flex;width:100%;height:100%;}
+#canvaswrap{flex:1;position:relative;overflow:hidden;}
+#atomcanvas{display:block;position:absolute;top:0;left:0;}
+
+/* FPS overlay */
+#fps{position:absolute;top:8px;left:8px;
+  background:rgba(2,4,10,0.75);border:1px solid rgba(255,255,255,0.07);
+  font-family:var(--fm);font-size:16px;font-weight:500;
+  padding:4px 10px;border-radius:4px;letter-spacing:1px;pointer-events:none;}
+#hint{position:absolute;bottom:10px;left:10px;
+  font-family:var(--fm);font-size:9px;color:rgba(40,60,90,0.9);
+  letter-spacing:2px;text-transform:uppercase;pointer-events:none;}
+#excflash{position:absolute;inset:0;background:rgba(255,200,80,0);pointer-events:none;}
+
+/* Side panel */
+#sidepanel{width:230px;flex-shrink:0;background:rgba(4,8,15,0.98);
+  border-left:1px solid var(--bdr);display:flex;flex-direction:column;
+  overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(0,80,120,0.4) transparent;}
+#sidepanel::-webkit-scrollbar{width:4px;}
+#sidepanel::-webkit-scrollbar-thumb{background:rgba(0,80,120,0.4);}
+
+.psec{padding:13px 15px;border-bottom:1px solid rgba(0,212,255,0.07);}
+.pst{font-family:var(--fm);font-size:9px;letter-spacing:3px;text-transform:uppercase;
+  color:var(--dim);margin-bottom:9px;display:flex;align-items:center;gap:7px;}
+.pst::after{content:'';flex:1;height:1px;background:rgba(0,212,255,0.08);}
 
 /* Element selector */
-#el-selector{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;}
-.el-arrow{
-  background:rgba(0,212,255,0.08);border:1px solid rgba(0,212,255,0.2);
-  color:var(--cyan);font-size:18px;cursor:pointer;
-  width:32px;height:32px;border-radius:4px;
-  display:flex;align-items:center;justify-content:center;
-  transition:background 0.1s;user-select:none;font-family:var(--ff);
-}
-.el-arrow:hover{background:rgba(0,212,255,0.15);}
-#el-display{text-align:center;flex:1;}
-#el-sym{
-  font-family:var(--ff);font-size:38px;font-weight:700;
-  color:var(--text,#e8eaf0);line-height:1;
-}
-#el-z{font-family:var(--fm);font-size:10px;color:#3a6080;letter-spacing:2px;}
+.elsel{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:9px;}
+.elarr{background:rgba(0,212,255,0.07);border:1px solid rgba(0,212,255,0.18);
+  color:var(--cyan);font-size:18px;cursor:pointer;width:30px;height:30px;
+  border-radius:4px;display:flex;align-items:center;justify-content:center;
+  transition:background .1s;user-select:none;font-family:var(--ff);}
+.elarr:hover{background:rgba(0,212,255,0.14);}
+.eldisp{text-align:center;flex:1;}
+#elsym{font-family:var(--ff);font-size:36px;font-weight:700;color:var(--text);line-height:1;}
+#elz{font-family:var(--fm);font-size:9px;color:var(--dim);letter-spacing:2px;margin-top:2px;}
 
-/* Element info */
-.info-row{display:flex;justify-content:space-between;align-items:center;padding:3px 0;font-size:12px;}
-.info-key{font-family:var(--fm);font-size:10px;color:#3a6080;letter-spacing:1px;}
-.info-val{font-family:var(--fm);font-size:11px;color:#c8d6e8;}
-
-/* Config display */
-#el-config{
-  font-family:var(--fm);font-size:10px;
-  color:var(--cyan);letter-spacing:1px;
-  background:rgba(0,212,255,0.05);
-  border:1px solid rgba(0,212,255,0.1);
-  border-radius:4px;padding:6px 10px;
-  margin-top:6px;line-height:1.8;
-  word-break:break-all;
-}
+.inforow{display:flex;justify-content:space-between;align-items:center;
+  padding:2px 0;font-size:11px;}
+.infok{font-family:var(--fm);font-size:9px;color:var(--dim);letter-spacing:1px;}
+.infov{font-family:var(--fm);font-size:10px;color:var(--text);}
+#elcfg{font-family:var(--fm);font-size:10px;color:var(--cyan);letter-spacing:1px;
+  background:rgba(0,212,255,0.04);border:1px solid rgba(0,212,255,0.1);
+  border-radius:4px;padding:5px 9px;margin-top:6px;line-height:1.9;word-break:break-all;}
 
 /* Mode buttons */
-.mode-btns{display:flex;flex-direction:column;gap:5px;}
-.mode-btn{
-  font-family:var(--fm);font-size:10px;letter-spacing:2px;
-  text-transform:uppercase;
-  background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.06);
-  color:#4a6080;padding:7px 10px;border-radius:4px;cursor:pointer;
-  transition:all 0.15s;text-align:left;
-  display:flex;align-items:center;gap:8px;
-}
-.mode-btn:hover{border-color:rgba(0,212,255,0.2);color:#8a9ab8;}
-.mode-btn.active{background:rgba(0,212,255,0.08);border-color:rgba(0,212,255,0.3);color:var(--cyan);}
-.mode-icon{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.modebtn{font-family:var(--fm);font-size:9px;letter-spacing:2px;text-transform:uppercase;
+  background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.06);
+  color:var(--mid);padding:7px 10px;border-radius:4px;cursor:pointer;
+  transition:all .15s;text-align:left;display:flex;align-items:center;gap:7px;
+  margin-bottom:4px;width:100%;}
+.modebtn:hover{border-color:rgba(0,212,255,0.2);color:#8a9ab8;}
+.modebtn.on{background:rgba(0,212,255,0.08);border-color:rgba(0,212,255,0.28);color:var(--cyan);}
+.mdot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
 
 /* Shell toggles */
-.shell-btns{display:flex;gap:5px;flex-wrap:wrap;}
-.shell-btn{
-  font-family:var(--fm);font-size:9px;letter-spacing:1px;
-  padding:5px 8px;border-radius:3px;cursor:pointer;
-  transition:all 0.15s;user-select:none;
-  background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.08);
-  color:#3a6080;
-}
-.shell-btn.on{color:#e8eaf0;border-color:rgba(255,255,255,0.2);}
+.shellbtns{display:flex;gap:5px;flex-wrap:wrap;}
+.shbtn{font-family:var(--fm);font-size:9px;letter-spacing:1px;
+  padding:4px 8px;border-radius:3px;cursor:pointer;user-select:none;
+  background:rgba(0,0,0,0.45);border:1px solid rgba(255,255,255,0.07);
+  color:var(--dim);transition:all .15s;}
+.shbtn.on{color:var(--text);border-color:rgba(255,255,255,0.18);}
 
-/* Emission spectrum */
-#spectrum{
-  height:28px;width:100%;border-radius:4px;overflow:hidden;
-  background:linear-gradient(to right,#000080,#0000ff,#00ffff,#00ff00,#ffff00,#ff8000,#ff0000);
-  position:relative;margin-top:6px;
-}
-.spec-line{
-  position:absolute;top:0;bottom:0;width:2px;
-  transform:translateX(-50%);transition:opacity 0.3s;
-}
-#spec-label{font-family:var(--fm);font-size:9px;color:#3a6080;letter-spacing:1px;margin-top:5px;}
+/* Spectrum */
+#speccanvas{width:100%;height:26px;display:block;border-radius:4px;margin-top:6px;}
+#speclbl{font-family:var(--fm);font-size:9px;color:var(--dim);
+  letter-spacing:1px;margin-top:4px;}
 
-/* FPS */
-#fps{
-  position:absolute;top:8px;left:8px;
-  background:rgba(2,4,10,0.7);border:1px solid rgba(255,255,255,0.07);
-  font-family:var(--fm);font-size:16px;font-weight:500;
-  padding:4px 10px;border-radius:4px;
-}
+/* Quantum numbers */
+.qnrow{display:flex;justify-content:space-between;align-items:center;padding:2px 0;}
+.qnk{font-family:var(--fm);font-size:9px;color:var(--dim);letter-spacing:1px;}
+.qnv{font-family:var(--fm);font-size:10px;color:var(--text);}
 
-/* Controls hint */
-#controls-hint{
-  position:absolute;bottom:10px;left:10px;
-  font-family:var(--fm);font-size:9px;color:#2a4060;letter-spacing:1px;
-}
+/* Nucleus zoom slider */
+#nzoom{width:100%;accent-color:var(--cyan);margin-top:5px;}
 
-/* Excitation flash */
-#exc-flash{
-  position:absolute;inset:0;
-  pointer-events:none;opacity:0;
-  transition:opacity 0.05s;
-}
+/* ══ LEARN ══ */
+#plearn{overflow-y:auto;background:var(--bg);
+  scrollbar-width:thin;scrollbar-color:var(--bg4) transparent;}
+#plearn::-webkit-scrollbar{width:5px;}
+#plearn::-webkit-scrollbar-thumb{background:var(--bg4);}
+.lhero{text-align:center;padding:58px 20px 40px;
+  background:radial-gradient(ellipse at 50% 0%,rgba(160,96,255,0.06),transparent 70%);
+  border-bottom:1px solid var(--bdr);}
+.lhero h1{font-family:var(--ff);font-size:clamp(26px,5vw,48px);font-weight:700;
+  letter-spacing:5px;text-transform:uppercase;color:var(--text);margin-bottom:9px;}
+.lhero h1 em{color:var(--pur);font-style:normal;}
+.lhero p{font-size:16px;font-weight:300;color:var(--mid);max-width:580px;margin:0 auto;line-height:1.7;}
+.ltags{margin-top:15px;display:flex;gap:7px;justify-content:center;flex-wrap:wrap;}
+.ltag{font-family:var(--fm);font-size:9px;padding:3px 11px;border-radius:20px;
+  background:rgba(0,0,0,0.5);border:1px solid var(--bdr);color:var(--pur);letter-spacing:1px;}
+.lbody{max-width:860px;margin:0 auto;padding:0 20px 80px;}
+.card{margin:26px 0;border:1px solid rgba(255,255,255,0.06);border-radius:10px;
+  overflow:hidden;background:linear-gradient(155deg,rgba(8,14,28,0.94),rgba(4,8,18,0.97));}
+.card-hd{display:flex;align-items:center;gap:12px;padding:14px 20px;
+  border-bottom:1px solid rgba(255,255,255,0.05);position:relative;overflow:hidden;}
+.card-hd::before{content:'';position:absolute;left:0;top:0;width:4px;height:100%;}
+.cc .card-hd::before{background:var(--cyan);}
+.cp .card-hd::before{background:var(--pur);}
+.ca .card-hd::before{background:var(--amb);}
+.cg .card-hd::before{background:var(--grn);}
+.ct .card-hd::before{background:var(--teal);}
+.cnum{font-family:var(--fm);font-size:9px;color:var(--dim);letter-spacing:1px;
+  background:rgba(0,0,0,0.45);border:1px solid rgba(255,255,255,0.06);
+  padding:2px 7px;border-radius:3px;}
+.card-hd h2{font-family:var(--ff);font-size:17px;font-weight:600;
+  letter-spacing:2px;color:var(--text);text-transform:uppercase;flex:1;}
+.badge{font-family:var(--fm);font-size:9px;padding:3px 9px;
+  border-radius:20px;white-space:nowrap;}
+.bdc{background:rgba(0,212,255,0.1);color:var(--cyan);border:1px solid rgba(0,212,255,0.25);}
+.bdp{background:rgba(160,96,255,0.1);color:var(--pur);border:1px solid rgba(160,96,255,0.25);}
+.bda{background:rgba(255,184,77,0.1);color:var(--amb);border:1px solid rgba(255,184,77,0.25);}
+.bdg{background:rgba(58,255,160,0.1);color:var(--grn);border:1px solid rgba(58,255,160,0.25);}
+.bdt{background:rgba(0,255,200,0.1);color:var(--teal);border:1px solid rgba(0,255,200,0.25);}
+.card-bd{padding:20px;}
+.card-bd p{font-size:14px;font-weight:300;line-height:1.75;color:var(--mid);margin-bottom:13px;}
+.card-bd p strong{color:var(--text);font-weight:600;}
+.card-bd p em{color:var(--pur);font-style:normal;}
+.eq{margin:15px 0;padding:12px 16px;background:rgba(0,0,0,0.52);
+  border-radius:6px;border-left:2px solid rgba(160,96,255,0.3);}
+.eqlbl{font-family:var(--fm);font-size:9px;letter-spacing:2px;
+  color:var(--dim);text-transform:uppercase;margin-bottom:8px;}
+.katex-display{margin:0!important;overflow-x:auto;padding:4px 0;}
+.katex{font-size:1.04em!important;}
+.note{display:flex;gap:10px;align-items:flex-start;border-radius:6px;padding:11px 13px;margin:12px 0;}
+.nc{border-left:2px solid var(--cyan);background:rgba(0,212,255,0.04);}
+.np{border-left:2px solid var(--pur);background:rgba(160,96,255,0.04);}
+.na{border-left:2px solid var(--amb);background:rgba(255,184,77,0.04);}
+.nico{font-size:13px;margin-top:1px;flex-shrink:0;}
+.note p{font-size:12px;line-height:1.65;color:var(--text);margin:0;}
+.note p code{font-family:var(--fm);font-size:10px;background:rgba(0,0,0,0.45);
+  padding:1px 5px;border-radius:3px;color:var(--pur);}
+.div{height:1px;background:linear-gradient(90deg,transparent,var(--bdr),transparent);margin:22px 0;}
+.ctrltbl{width:100%;border-collapse:collapse;font-family:var(--fm);font-size:11px;margin-top:9px;}
+.ctrltbl th{background:rgba(160,96,255,0.08);color:var(--pur);font-weight:600;
+  letter-spacing:2px;text-transform:uppercase;padding:7px 12px;
+  text-align:left;border-bottom:2px solid rgba(160,96,255,0.18);}
+.ctrltbl td{padding:7px 12px;border-bottom:1px solid rgba(255,255,255,0.04);color:var(--mid);}
+.ctrltbl tr:hover td{background:rgba(160,96,255,0.025);}
+.ctrltbl td:first-child{color:var(--pur);}
 
-/* Click hint */
-#click-hint{
-  position:absolute;top:50%;left:50%;
-  transform:translate(-50%,-50%);
-  font-family:var(--fm);font-size:11px;color:rgba(0,212,255,0.3);
-  letter-spacing:3px;text-transform:uppercase;
-  pointer-events:none;transition:opacity 1s;
-}
+/* ══ CODE ══ */
+#pcode{overflow-y:auto;background:var(--bg);
+  scrollbar-width:thin;scrollbar-color:var(--bg4) transparent;}
+.chero{text-align:center;padding:50px 20px 34px;
+  background:radial-gradient(ellipse at 50% 0%,rgba(0,255,200,0.05),transparent 70%);
+  border-bottom:1px solid var(--bdr);margin-bottom:30px;}
+.chero h1{font-family:var(--ff);font-size:clamp(24px,4vw,42px);font-weight:700;
+  letter-spacing:5px;text-transform:uppercase;color:var(--text);margin-bottom:9px;}
+.chero h1 em{color:var(--teal);font-style:normal;}
+.chero p{font-size:14px;font-weight:300;color:var(--mid);max-width:520px;margin:0 auto;line-height:1.7;}
+.csect{max-width:860px;margin:0 auto;padding:0 20px 80px;}
+.ablk{margin:22px 0;}
+.atitle{font-family:var(--ff);font-size:13px;letter-spacing:2px;color:var(--text);
+  text-transform:uppercase;display:flex;align-items:center;gap:10px;margin-bottom:9px;}
+.albl{font-family:var(--fm);font-size:9px;background:rgba(0,255,200,0.1);
+  color:var(--teal);border:1px solid rgba(0,255,200,0.3);
+  padding:2px 9px;border-radius:20px;letter-spacing:1px;}
+pre{background:rgba(0,0,0,0.72);border:1px solid rgba(255,255,255,0.07);
+  border-radius:8px;padding:15px;font-family:var(--fm);font-size:11px;
+  line-height:1.85;color:var(--mid);overflow-x:auto;scrollbar-width:thin;}
+.kw{color:var(--cyan);}.fn{color:var(--amb);}.cm2{color:var(--dim);font-style:italic;}
+.num{color:var(--grn);}.op{color:var(--pur);}
+.ctab{width:100%;border-collapse:collapse;font-family:var(--fm);font-size:11px;margin:12px 0;}
+.ctab th{background:rgba(0,255,200,0.07);color:var(--teal);font-weight:600;
+  letter-spacing:2px;text-transform:uppercase;padding:8px 12px;
+  text-align:left;border-bottom:2px solid rgba(0,255,200,0.18);}
+.ctab td{padding:7px 12px;border-bottom:1px solid rgba(255,255,255,0.04);color:var(--mid);}
+.ctab tr:hover td{background:rgba(0,255,200,0.02);}
+.ctab td:first-child{color:var(--text);}
+.tg{color:var(--grn)!important;}.to{color:var(--amb)!important;}
 </style>
 </head>
 <body>
-<div id="layout">
-  <div id="canvas-wrap">
-    <canvas id="c"></canvas>
-    <div id="fps" style="color:#3affa0">60 FPS</div>
-    <div id="controls-hint">Drag: rotate &nbsp;·&nbsp; Scroll: zoom &nbsp;·&nbsp; Click electron: excite</div>
-    <div id="exc-flash"></div>
-    <div id="click-hint">DRAG TO ROTATE</div>
+
+<!-- NAV -->
+<nav>
+  <div class="nlogo"><span class="ndot"></span>Quantum Atom Simulator</div>
+  <div class="tabs" style="margin:0 auto;">
+    <button class="tab on" onclick="switchTab('sim')">⚛ Simulate</button>
+    <button class="tab" onclick="switchTab('learn')">∑ Learn</button>
+    <button class="tab" onclick="switchTab('code')">&lt;/&gt; Code</button>
   </div>
+  <div class="nbadge">3D Orbitals · 36 Elements · Quantum</div>
+</nav>
 
-  <div id="panel">
-    <!-- Element Selector -->
-    <div class="panel-section">
-      <div class="pst">Element</div>
-      <div id="el-selector">
-        <div class="el-arrow" onclick="changeElement(-1)">‹</div>
-        <div id="el-display">
-          <div id="el-sym">H</div>
-          <div id="el-z">Z = 1</div>
+<!-- ══ SIMULATE ══ -->
+<div id="psim" class="panel on">
+  <div id="simlayout">
+    <div id="canvaswrap">
+      <canvas id="atomcanvas"></canvas>
+      <div id="fps" style="color:#3affa0">60 FPS</div>
+      <div id="hint">Drag: rotate &nbsp;·&nbsp; Scroll: zoom &nbsp;·&nbsp; Click electron: excite</div>
+      <div id="excflash"></div>
+    </div>
+    <div id="sidepanel">
+
+      <!-- Element -->
+      <div class="psec">
+        <div class="pst">Element</div>
+        <div class="elsel">
+          <div class="elarr" onclick="changeEl(-1)">‹</div>
+          <div class="eldisp">
+            <div id="elsym">H</div>
+            <div id="elz">Z = 1</div>
+          </div>
+          <div class="elarr" onclick="changeEl(1)">›</div>
         </div>
-        <div class="el-arrow" onclick="changeElement(1)">›</div>
+        <div class="inforow"><span class="infok">Name</span><span class="infov" id="elname">Hydrogen</span></div>
+        <div class="inforow"><span class="infok">Mass</span><span class="infov" id="elmass">1.008 u</span></div>
+        <div class="inforow"><span class="infok">Period</span><span class="infov" id="elper">1</span></div>
+        <div class="inforow"><span class="infok">Block</span><span class="infov" id="elblk">s-block</span></div>
+        <div id="elcfg">1s¹</div>
       </div>
-      <div class="info-row"><span class="info-key">Name</span><span class="info-val" id="el-name">Hydrogen</span></div>
-      <div class="info-row"><span class="info-key">Mass</span><span class="info-val" id="el-mass">1.008 u</span></div>
-      <div class="info-row"><span class="info-key">Period</span><span class="info-val" id="el-period">1</span></div>
-      <div class="info-row"><span class="info-key">Block</span><span class="info-val" id="el-block">s</span></div>
-      <div id="el-config">1s¹</div>
-    </div>
 
-    <!-- View Mode -->
-    <div class="panel-section">
-      <div class="pst">Visualization</div>
-      <div class="mode-btns">
-        <div class="mode-btn active" data-mode="bohr" onclick="setMode('bohr')">
-          <div class="mode-icon" style="background:#00d4ff"></div>Bohr Model
+      <!-- Mode -->
+      <div class="psec">
+        <div class="pst">Visualization</div>
+        <button class="modebtn on" id="mbohr" onclick="setMode('bohr')"><span class="mdot" style="background:var(--cyan)"></span>Bohr Model</button>
+        <button class="modebtn" id="mcloud" onclick="setMode('cloud')"><span class="mdot" style="background:var(--pur)"></span>Quantum Cloud</button>
+        <button class="modebtn" id="morb" onclick="setMode('orbital')"><span class="mdot" style="background:var(--teal)"></span>Orbital Shapes</button>
+      </div>
+
+      <!-- Shells -->
+      <div class="psec">
+        <div class="pst">Shells</div>
+        <div class="shellbtns">
+          <div class="shbtn on" id="sh0" onclick="toggleShell(0)">K n=1</div>
+          <div class="shbtn on" id="sh1" onclick="toggleShell(1)">L n=2</div>
+          <div class="shbtn on" id="sh2" onclick="toggleShell(2)">M n=3</div>
+          <div class="shbtn on" id="sh3" onclick="toggleShell(3)">N n=4</div>
         </div>
-        <div class="mode-btn" data-mode="cloud" onclick="setMode('cloud')">
-          <div class="mode-icon" style="background:#a060ff"></div>Quantum Cloud
-        </div>
-        <div class="mode-btn" data-mode="orbital" onclick="setMode('orbital')">
-          <div class="mode-icon" style="background:#00ffc8"></div>Orbital Shapes
-        </div>
+        <div style="font-family:var(--fm);font-size:9px;color:var(--dim);margin-top:7px;letter-spacing:1px;">Click to show/hide</div>
+      </div>
+
+      <!-- Nucleus -->
+      <div class="psec">
+        <div class="pst">Nucleus</div>
+        <div class="inforow"><span class="infok">Protons</span><span class="infov" id="nprot">1</span></div>
+        <div class="inforow"><span class="infok">Neutrons</span><span class="infov" id="nneut">0</span></div>
+        <div style="font-family:var(--fm);font-size:9px;color:var(--dim);margin-top:8px;letter-spacing:1px;">NUCLEUS ZOOM</div>
+        <input type="range" id="nzoom" min="0.5" max="6" step="0.1" value="1" oninput="nucZoom=+this.value">
+      </div>
+
+      <!-- Spectrum -->
+      <div class="psec">
+        <div class="pst">Emission Spectrum</div>
+        <canvas id="speccanvas" width="200" height="26"></canvas>
+        <div id="speclbl">Click electron to excite → emission</div>
+      </div>
+
+      <!-- Quantum numbers -->
+      <div class="psec">
+        <div class="pst">Selected Orbital</div>
+        <div class="qnrow"><span class="qnk">n (principal)</span><span class="qnv" id="qn">—</span></div>
+        <div class="qnrow"><span class="qnk">l (angular)</span><span class="qnv" id="ql">—</span></div>
+        <div class="qnrow"><span class="qnk">Type</span><span class="qnv" id="qtype">—</span></div>
+        <div class="qnrow"><span class="qnk">Energy (eV)</span><span class="qnv" id="qen">—</span></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ══ LEARN ══ -->
+<div id="plearn" class="panel">
+  <div class="lhero">
+    <h1>Quantum <em>Mechanics</em></h1>
+    <p>The physics and mathematics of the quantum atom — from the Bohr model to wavefunction probability clouds and atomic emission spectra.</p>
+    <div class="ltags">
+      <span class="ltag">Bohr Model</span><span class="ltag">Schrödinger Equation</span>
+      <span class="ltag">Quantum Numbers</span><span class="ltag">Orbital Shapes</span>
+      <span class="ltag">Probability Density</span><span class="ltag">Emission Spectra</span>
+      <span class="ltag">Aufbau Principle</span>
+    </div>
+  </div>
+  <div class="lbody">
+
+    <div class="card cc">
+      <div class="card-hd"><span class="cnum">§ 01</span><h2>The Bohr Model</h2><span class="badge bdc">1913</span></div>
+      <div class="card-bd">
+        <p>Niels Bohr proposed that electrons orbit the nucleus in <strong>discrete circular shells</strong>, each with a fixed energy. Electrons can jump between shells by absorbing or emitting photons of exactly the right energy.</p>
+        <div class="eq"><div class="eqlbl">Bohr energy levels for hydrogen-like atoms</div>$$E_n = -\frac{13.6\,\text{eV}}{n^2}\cdot Z^2$$</div>
+        <div class="eq"><div class="eqlbl">Orbital radius of shell n (Bohr radius a₀ = 0.0529 nm)</div>$$r_n = \frac{n^2 a_0}{Z}$$</div>
+        <div class="eq"><div class="eqlbl">Photon energy emitted on transition n₂ → n₁ (n₂ > n₁)</div>$$\Delta E = E_{n_1} - E_{n_2} = 13.6\,\text{eV}\left(\frac{1}{n_1^2}-\frac{1}{n_2^2}\right)$$</div>
+        <div class="note nc"><span class="nico">💡</span><p>The Bohr model correctly predicts hydrogen spectral lines but fails for multi-electron atoms. It was superseded by quantum mechanics, which describes electrons as <strong>probability waves</strong> rather than point particles on fixed orbits.</p></div>
       </div>
     </div>
 
-    <!-- Shell Visibility -->
-    <div class="panel-section">
-      <div class="pst">Shells</div>
-      <div class="shell-btns" id="shell-btns">
-        <div class="shell-btn on" data-shell="0">K (n=1)</div>
-        <div class="shell-btn on" data-shell="1">L (n=2)</div>
-        <div class="shell-btn on" data-shell="2">M (n=3)</div>
-        <div class="shell-btn on" data-shell="3">N (n=4)</div>
-      </div>
-      <div style="margin-top:8px;font-family:var(--fm);font-size:9px;color:#2a4060;letter-spacing:1px;">Click shell to toggle visibility</div>
-    </div>
-
-    <!-- Nucleus zoom -->
-    <div class="panel-section">
-      <div class="pst">Nucleus</div>
-      <div class="info-row"><span class="info-key">Protons</span><span class="info-val" id="n-protons">1</span></div>
-      <div class="info-row"><span class="info-key">Neutrons</span><span class="info-val" id="n-neutrons">0</span></div>
-      <div style="margin-top:8px;">
-        <div style="font-family:var(--fm);font-size:9px;color:#3a6080;margin-bottom:5px;letter-spacing:1px;">ZOOM TO NUCLEUS</div>
-        <input type="range" id="nuc-zoom" min="1" max="5" step="0.1" value="1"
-          style="width:100%;accent-color:var(--cyan);" oninput="nucZoom=this.value*1">
+    <div class="card cp">
+      <div class="card-hd"><span class="cnum">§ 02</span><h2>Schrödinger's Wave Equation</h2><span class="badge bdp">Quantum Mechanics</span></div>
+      <div class="card-bd">
+        <p>The full quantum description of the electron comes from Schrödinger's equation. Its solutions — <strong>wavefunctions ψ</strong> — are characterised by three quantum numbers (n, l, mₗ) and describe the probability amplitude of finding the electron at any position.</p>
+        <div class="eq"><div class="eqlbl">Time-independent Schrödinger equation</div>$$\hat{H}\psi = E\psi \qquad \hat{H} = -\frac{\hbar^2}{2m}\nabla^2 + V(r)$$</div>
+        <div class="eq"><div class="eqlbl">Wavefunction in spherical coordinates (hydrogen)</div>$$\psi_{nlm}(r,\theta,\phi) = R_{nl}(r)\cdot Y_l^m(\theta,\phi)$$</div>
+        <div class="eq"><div class="eqlbl">Probability density — the quantum cloud</div>$$P(r,\theta,\phi) = |\psi_{nlm}|^2 = |R_{nl}(r)|^2\cdot|Y_l^m(\theta,\phi)|^2$$</div>
+        <div class="note np"><span class="nico">🌊</span><p>The cloud visualization in this simulator places dots randomly with probability proportional to $|\psi|^2$. The shape you see is where the electron is <em>most likely</em> to be found — not a fixed orbit. The electron has no definite position until measured.</p></div>
       </div>
     </div>
 
-    <!-- Emission Spectrum -->
-    <div class="panel-section">
-      <div class="pst">Emission Spectrum</div>
-      <div id="spectrum"><canvas id="spec-canvas" width="208" height="28" style="width:100%;height:100%;"></canvas></div>
-      <div id="spec-label">Click an electron to excite → emission</div>
+    <div class="card ca">
+      <div class="card-hd"><span class="cnum">§ 03</span><h2>Quantum Numbers</h2><span class="badge bda">Orbital Classification</span></div>
+      <div class="card-bd">
+        <p>Each electron state is fully described by <strong>four quantum numbers</strong>. The first three come from the Schrödinger equation; the fourth (spin) comes from Dirac's relativistic quantum theory.</p>
+        <div class="eq"><div class="eqlbl">Principal quantum number — shell energy and size</div>$$n = 1, 2, 3, 4\ldots \quad\Rightarrow\quad \text{shells K, L, M, N}\ldots$$</div>
+        <div class="eq"><div class="eqlbl">Angular momentum quantum number — orbital shape</div>$$l = 0, 1, 2, 3\ldots(n-1) \quad\Rightarrow\quad s,\, p,\, d,\, f\,\text{ orbitals}$$</div>
+        <div class="eq"><div class="eqlbl">Magnetic quantum number — orbital orientation</div>$$m_l = -l, \ldots, 0, \ldots, +l \quad \Rightarrow \quad 2l+1\text{ orientations}$$</div>
+        <div class="eq"><div class="eqlbl">Pauli exclusion — max electrons per orbital</div>$$N_{\max}(l) = 2(2l+1) \quad\Rightarrow\quad s{:}2,\; p{:}6,\; d{:}10,\; f{:}14$$</div>
+        <div class="note na"><span class="nico">📊</span><p>Shell capacities follow from this: K (n=1) holds $2(1)^2=2$ electrons, L holds $2(2)^2=8$, M holds $2(3)^2=18$, N holds $2(4)^2=32$.</p></div>
+      </div>
     </div>
 
-    <!-- Quantum Numbers -->
-    <div class="panel-section">
-      <div class="pst">Selected Orbital</div>
-      <div class="info-row"><span class="info-key">n (principal)</span><span class="info-val" id="qn-n">—</span></div>
-      <div class="info-row"><span class="info-key">l (angular)</span><span class="info-val" id="qn-l">—</span></div>
-      <div class="info-row"><span class="info-key">ml (magnetic)</span><span class="info-val" id="qn-ml">—</span></div>
-      <div class="info-row"><span class="info-key">Orbital type</span><span class="info-val" id="qn-type">—</span></div>
-      <div class="info-row"><span class="info-key">Energy (eV)</span><span class="info-val" id="qn-energy">—</span></div>
+    <div class="card cp">
+      <div class="card-hd"><span class="cnum">§ 04</span><h2>Orbital Shapes — Spherical Harmonics</h2><span class="badge bdp">3D Geometry</span></div>
+      <div class="card-bd">
+        <p>The angular part of the wavefunction is described by <strong>real spherical harmonics</strong> $Y_l^m(\theta,\phi)$. These give each orbital type its characteristic 3D shape.</p>
+        <div class="eq"><div class="eqlbl">s orbital (l=0) — spherically symmetric</div>$$Y_0^0 = \frac{1}{\sqrt{4\pi}}\quad\Rightarrow\quad|\psi|^2\propto e^{-2r/a_0}$$</div>
+        <div class="eq"><div class="eqlbl">p orbital (l=1) — dumbbell along an axis</div>$$Y_1^0 = \sqrt{\frac{3}{4\pi}}\cos\theta \quad (p_z)\qquad Y_1^{\pm1} = \sqrt{\frac{3}{8\pi}}\sin\theta\,e^{\pm i\phi} \quad (p_x,\,p_y)$$</div>
+        <div class="eq"><div class="eqlbl">d orbital (l=2) — four-lobe cloverleaf or ring+lobes</div>$$Y_2^0 = \sqrt{\frac{5}{16\pi}}(3\cos^2\theta-1)\qquad Y_2^{\pm1},Y_2^{\pm2}\text{ — rotated variants}$$</div>
+        <div class="note np"><span class="nico">🔮</span><p>In the <em>Orbital Shapes</em> mode, this engine uses the squared spherical harmonics as a radial weighting to place cloud dots — larger $|Y_l^m|^2$ at a given angle means more dots there. The result is a 3D point-cloud isosurface of each orbital's probability lobe.</p></div>
+      </div>
     </div>
+
+    <div class="card cg">
+      <div class="card-hd"><span class="cnum">§ 05</span><h2>Emission Spectra</h2><span class="badge bdg">Photon Physics</span></div>
+      <div class="card-bd">
+        <p>When an electron drops from a higher shell to a lower one it emits a <strong>photon</strong> whose energy exactly equals the energy difference. Different transitions emit different colours — this is the atom's unique spectral fingerprint.</p>
+        <div class="eq"><div class="eqlbl">Rydberg formula — wavelength of emitted photon</div>$$\frac{1}{\lambda} = R_H\left(\frac{1}{n_1^2}-\frac{1}{n_2^2}\right)\qquad R_H = 1.097\times10^7\,\text{m}^{-1}$$</div>
+        <div class="eq"><div class="eqlbl">Photon wavelength from energy gap (h·c = 1240 eV·nm)</div>$$\lambda = \frac{hc}{\Delta E} = \frac{1240\,\text{eV·nm}}{\Delta E}$$</div>
+        <p>Named series: <em>Lyman</em> (n→1, UV), <em>Balmer</em> (n→2, visible), <em>Paschen</em> (n→3, infrared). The visible Balmer lines — red (Hα 656nm), cyan (Hβ 486nm), violet (Hγ 434nm) — are the classic hydrogen spectrum.</p>
+        <div class="note nc"><span class="nico">🌈</span><p>Click any electron in the simulation to excite it. The emitted wavelength appears as a bright line in the spectrum bar. The color maps wavelength 380–700nm → visible RGB using a piecewise linear approximation of the human eye's response.</p></div>
+      </div>
+    </div>
+
+    <div class="card ct">
+      <div class="card-hd"><span class="cnum">§ 06</span><h2>Aufbau & Electron Configuration</h2><span class="badge bdt">Filling Rules</span></div>
+      <div class="card-bd">
+        <p>Electrons fill orbitals in a specific order — lowest energy first. The <strong>Aufbau principle</strong>, <strong>Hund's rule</strong>, and the <strong>Pauli exclusion principle</strong> together determine the ground-state electron configuration of every element.</p>
+        <div class="eq"><div class="eqlbl">Filling order (Madelung rule)</div>$$1s \to 2s \to 2p \to 3s \to 3p \to 4s \to 3d \to 4p \to 5s \to 4d \to 5p \to \cdots$$</div>
+        <div class="eq"><div class="eqlbl">Orbital energy anomalies (Chromium, Copper)</div>$$\text{Cr}: [\text{Ar}]\,3d^5\,4s^1 \quad\text{not}\quad 3d^4\,4s^2\qquad\text{(half-filled d is extra stable)}$$</div>
+        <div class="note nc"><span class="nico">📋</span><p>This engine covers <strong>H (Z=1) to Kr (Z=36)</strong> with correct configurations including the Cr and Cu anomalies. Use the arrows or keyboard ← → to browse elements. ↑ ↓ jumps by 10.</p></div>
+        <div class="div"></div>
+        <div style="font-family:var(--ff);font-size:12px;letter-spacing:2px;color:var(--text);text-transform:uppercase;margin-bottom:9px;">All Controls</div>
+        <table class="ctrltbl">
+          <tr><th>Input</th><th>Action</th></tr>
+          <tr><td>Mouse drag (canvas)</td><td>Rotate atom in 3D</td></tr>
+          <tr><td>Scroll wheel</td><td>Zoom in / out</td></tr>
+          <tr><td>Click electron</td><td>Excite → emission line appears</td></tr>
+          <tr><td>← → arrows / panel buttons</td><td>Previous / next element</td></tr>
+          <tr><td>↑ ↓ arrows</td><td>Jump 10 elements forward / back</td></tr>
+          <tr><td>Mode buttons</td><td>Switch: Bohr / Quantum Cloud / Orbital Shapes</td></tr>
+          <tr><td>Shell buttons</td><td>Toggle individual shell visibility</td></tr>
+          <tr><td>Nucleus zoom slider</td><td>Zoom into nucleus to see protons / neutrons</td></tr>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══ CODE ══ -->
+<div id="pcode" class="panel">
+  <div class="chero"><h1>Algorithm <em>Source</em></h1><p>Implementation notes and pseudocode for the 3D quantum atom rendering engine.</p></div>
+  <div class="csect">
+
+    <div class="ablk">
+      <div class="atitle">3D Rotation + Perspective Projection <span class="albl">O(N) per frame</span></div>
+<pre><span class="cm2">// Applied to every point: electrons, nucleus particles, cloud dots</span>
+<span class="kw">function</span> <span class="fn">project</span>(x, y, z):
+  <span class="cm2">// 1. Rotate around Y axis (user drag — left/right)</span>
+  x1 = x*cos(rotY) + z*sin(rotY)
+  z1 =-x*sin(rotY) + z*cos(rotY)
+
+  <span class="cm2">// 2. Rotate around X axis (user drag — up/down)</span>
+  y2 = y*cos(rotX) - z1*sin(rotX)
+  z2 = y*sin(rotX) + z1*cos(rotX)
+
+  <span class="cm2">// 3. Perspective divide</span>
+  depth = z2 + <span class="num">700</span>           <span class="cm2">// push behind camera</span>
+  <span class="kw">if</span> depth < <span class="num">5</span>: <span class="kw">return</span> null
+  s  = <span class="num">500</span> / depth           <span class="cm2">// focal length = 500</span>
+  sx = centreX + x1 * s * zoom
+  sy = centreY + y2 * s * zoom
+  <span class="kw">return</span> { sx, sy, s, depth }</pre>
+    </div>
+
+    <div class="div"></div>
+    <div class="ablk">
+      <div class="atitle">Probability Cloud Generation <span class="albl">Rejection Sampling</span></div>
+<pre><span class="cm2">// Precomputed once per orbital type (n, l)
+// Uses hydrogen-like radial + angular wavefunctions</span>
+<span class="kw">function</span> <span class="fn">buildCloud</span>(n, l, shellRadius):
+  pts = []
+  <span class="kw">while</span> pts.length < N_CLOUD_POINTS:
+    r     = random(0, shellRadius * 2.2)       <span class="cm2">// radial distance</span>
+    theta = acos(2*random() - 1)               <span class="cm2">// polar angle</span>
+    phi   = random(0, 2π)                      <span class="cm2">// azimuthal angle</span>
+
+    <span class="cm2">// Radial probability (simplified hydrogen-like)</span>
+    rn = r / shellRadius
+    P_radial = r² * exp(-2*rn/n) * (polynomial in rn)
+
+    <span class="cm2">// Angular probability (real spherical harmonics)</span>
+    <span class="kw">if</span>   l==0: P_ang = 1                          <span class="cm2">// s: sphere</span>
+    <span class="kw">elif</span> l==1: P_ang = |cos(theta)|² + ...        <span class="cm2">// p: dumbbell</span>
+    <span class="kw">elif</span> l==2: P_ang = sin²θ*cos²θ*(1+cos2φ)     <span class="cm2">// d: cloverleaf</span>
+    <span class="kw">elif</span> l==3: P_ang = |cos(3φ)|*sin³θ*cos²θ     <span class="cm2">// f: complex</span>
+
+    <span class="kw">if</span> random() < P_radial * P_ang * K:
+      pts.push(sphericalToCartesian(r, theta, phi))
+  <span class="kw">return</span> pts</pre>
+    </div>
+
+    <div class="div"></div>
+    <div class="ablk">
+      <div class="atitle">Electron Excitation + Emission <span class="albl">Quantum Jump</span></div>
+<pre><span class="kw">function</span> <span class="fn">exciteElectron</span>(eIdx):
+  e  = electrons[eIdx]
+  n1 = orbitals[e.orbIdx].n           <span class="cm2">// ground shell</span>
+  n2 = random(n1+1, min(n1+2, 4))    <span class="cm2">// excited shell</span>
+
+  <span class="cm2">// Energy of emitted photon</span>
+  dE  = 13.6 * (1/n1² - 1/n2²)       <span class="cm2">// eV</span>
+  lam = 1240 / dE                     <span class="cm2">// wavelength in nm</span>
+
+  <span class="cm2">// Animate excitation</span>
+  e.exciteLevel = <span class="num">1</span>
+  e.exciteTimer = <span class="num">1.5</span>               <span class="cm2">// seconds until drop back</span>
+
+  <span class="cm2">// Add line to emission spectrum</span>
+  <span class="kw">if</span> 380 < lam < 750:
+    specLines.push({ lam, life: <span class="num">1</span> })
+    drawSpectrumLine(lam)</pre>
+    </div>
+
+    <div class="div"></div>
+    <div class="ablk">
+      <div class="atitle">Performance Notes</div>
+      <table class="ctab">
+        <tr><th>System</th><th>Complexity</th><th>Count per frame</th></tr>
+        <tr><td>Cloud point projection</td><td class="tg">O(C)</td><td>~4000 pts per active orbital</td></tr>
+        <tr><td>Depth sort (cloud)</td><td class="to">O(C log C)</td><td>Sort then draw back→front</td></tr>
+        <tr><td>Nucleus projection</td><td class="tg">O(P)</td><td>P = protons + neutrons</td></tr>
+        <tr><td>Electron update</td><td class="tg">O(E)</td><td>E ≤ 36 electrons (Kr)</td></tr>
+        <tr><td>3D rotation</td><td class="tg">O(N)</td><td>6 multiplies per point</td></tr>
+        <tr><td>Cloud precompute</td><td class="to">Once per orbital</td><td>~8 clouds × 4000 pts cached</td></tr>
+      </table>
+    </div>
+
   </div>
 </div>
 
 <script>
 'use strict';
 
-// ═══════════════ ELEMENT DATA ═══════════════
-// cfg: [1s, 2s, 2p, 3s, 3p, 3d, 4s, 4p]
-const ELEMENTS=[
-  {Z:1, sym:'H',  name:'Hydrogen',   mass:1.008,  cfg:[1,0,0,0,0,0,0,0], period:1,block:'s'},
-  {Z:2, sym:'He', name:'Helium',     mass:4.003,  cfg:[2,0,0,0,0,0,0,0], period:1,block:'s'},
-  {Z:3, sym:'Li', name:'Lithium',    mass:6.941,  cfg:[2,1,0,0,0,0,0,0], period:2,block:'s'},
-  {Z:4, sym:'Be', name:'Beryllium',  mass:9.012,  cfg:[2,2,0,0,0,0,0,0], period:2,block:'s'},
-  {Z:5, sym:'B',  name:'Boron',      mass:10.81,  cfg:[2,2,1,0,0,0,0,0], period:2,block:'p'},
-  {Z:6, sym:'C',  name:'Carbon',     mass:12.01,  cfg:[2,2,2,0,0,0,0,0], period:2,block:'p'},
-  {Z:7, sym:'N',  name:'Nitrogen',   mass:14.01,  cfg:[2,2,3,0,0,0,0,0], period:2,block:'p'},
-  {Z:8, sym:'O',  name:'Oxygen',     mass:16.00,  cfg:[2,2,4,0,0,0,0,0], period:2,block:'p'},
-  {Z:9, sym:'F',  name:'Fluorine',   mass:19.00,  cfg:[2,2,5,0,0,0,0,0], period:2,block:'p'},
-  {Z:10,sym:'Ne', name:'Neon',       mass:20.18,  cfg:[2,2,6,0,0,0,0,0], period:2,block:'p'},
-  {Z:11,sym:'Na', name:'Sodium',     mass:22.99,  cfg:[2,2,6,1,0,0,0,0], period:3,block:'s'},
-  {Z:12,sym:'Mg', name:'Magnesium',  mass:24.31,  cfg:[2,2,6,2,0,0,0,0], period:3,block:'s'},
-  {Z:13,sym:'Al', name:'Aluminium',  mass:26.98,  cfg:[2,2,6,2,1,0,0,0], period:3,block:'p'},
-  {Z:14,sym:'Si', name:'Silicon',    mass:28.09,  cfg:[2,2,6,2,2,0,0,0], period:3,block:'p'},
-  {Z:15,sym:'P',  name:'Phosphorus', mass:30.97,  cfg:[2,2,6,2,3,0,0,0], period:3,block:'p'},
-  {Z:16,sym:'S',  name:'Sulfur',     mass:32.06,  cfg:[2,2,6,2,4,0,0,0], period:3,block:'p'},
-  {Z:17,sym:'Cl', name:'Chlorine',   mass:35.45,  cfg:[2,2,6,2,5,0,0,0], period:3,block:'p'},
-  {Z:18,sym:'Ar', name:'Argon',      mass:39.95,  cfg:[2,2,6,2,6,0,0,0], period:3,block:'p'},
-  {Z:19,sym:'K',  name:'Potassium',  mass:39.10,  cfg:[2,2,6,2,6,0,1,0], period:4,block:'s'},
-  {Z:20,sym:'Ca', name:'Calcium',    mass:40.08,  cfg:[2,2,6,2,6,0,2,0], period:4,block:'s'},
-  {Z:21,sym:'Sc', name:'Scandium',   mass:44.96,  cfg:[2,2,6,2,6,1,2,0], period:4,block:'d'},
-  {Z:22,sym:'Ti', name:'Titanium',   mass:47.87,  cfg:[2,2,6,2,6,2,2,0], period:4,block:'d'},
-  {Z:23,sym:'V',  name:'Vanadium',   mass:50.94,  cfg:[2,2,6,2,6,3,2,0], period:4,block:'d'},
-  {Z:24,sym:'Cr', name:'Chromium',   mass:52.00,  cfg:[2,2,6,2,6,5,1,0], period:4,block:'d'},
-  {Z:25,sym:'Mn', name:'Manganese',  mass:54.94,  cfg:[2,2,6,2,6,5,2,0], period:4,block:'d'},
-  {Z:26,sym:'Fe', name:'Iron',       mass:55.85,  cfg:[2,2,6,2,6,6,2,0], period:4,block:'d'},
-  {Z:27,sym:'Co', name:'Cobalt',     mass:58.93,  cfg:[2,2,6,2,6,7,2,0], period:4,block:'d'},
-  {Z:28,sym:'Ni', name:'Nickel',     mass:58.69,  cfg:[2,2,6,2,6,8,2,0], period:4,block:'d'},
-  {Z:29,sym:'Cu', name:'Copper',     mass:63.55,  cfg:[2,2,6,2,6,10,1,0],period:4,block:'d'},
-  {Z:30,sym:'Zn', name:'Zinc',       mass:65.38,  cfg:[2,2,6,2,6,10,2,0],period:4,block:'d'},
-  {Z:31,sym:'Ga', name:'Gallium',    mass:69.72,  cfg:[2,2,6,2,6,10,2,1],period:4,block:'p'},
-  {Z:32,sym:'Ge', name:'Germanium',  mass:72.63,  cfg:[2,2,6,2,6,10,2,2],period:4,block:'p'},
-  {Z:33,sym:'As', name:'Arsenic',    mass:74.92,  cfg:[2,2,6,2,6,10,2,3],period:4,block:'p'},
-  {Z:34,sym:'Se', name:'Selenium',   mass:78.96,  cfg:[2,2,6,2,6,10,2,4],period:4,block:'p'},
-  {Z:35,sym:'Br', name:'Bromine',    mass:79.90,  cfg:[2,2,6,2,6,10,2,5],period:4,block:'p'},
-  {Z:36,sym:'Kr', name:'Krypton',    mass:83.80,  cfg:[2,2,6,2,6,10,2,6],period:4,block:'p'},
+// ══════════════════════════════════════════════
+//  TAB SYSTEM
+// ══════════════════════════════════════════════
+let katexReady=false, mathDone=false, learnSeen=false;
+function tryRenderMath(){
+  if(katexReady&&learnSeen&&!mathDone){
+    renderMathInElement(document.getElementById('plearn'),{
+      delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],
+      throwOnError:false
+    });
+    mathDone=true;
+  }
+}
+function switchTab(t){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('on'));
+  document.getElementById('p'+t).classList.add('on');
+  document.querySelectorAll('.tab').forEach(b=>{
+    if(b.textContent.toLowerCase().includes(t.slice(0,3)))b.classList.add('on');
+  });
+  if(t==='learn'){learnSeen=true;tryRenderMath();}
+  if(t==='sim')resizeAtom();
+}
+
+// ══════════════════════════════════════════════
+//  ELEMENT DATA
+// ══════════════════════════════════════════════
+// cfg: [1s,2s,2p,3s,3p,3d,4s,4p]
+const ELS=[
+  {Z:1, s:'H',  n:'Hydrogen',   m:1.008, cfg:[1,0,0,0,0,0,0,0], p:1,b:'s'},
+  {Z:2, s:'He', n:'Helium',     m:4.003, cfg:[2,0,0,0,0,0,0,0], p:1,b:'s'},
+  {Z:3, s:'Li', n:'Lithium',    m:6.941, cfg:[2,1,0,0,0,0,0,0], p:2,b:'s'},
+  {Z:4, s:'Be', n:'Beryllium',  m:9.012, cfg:[2,2,0,0,0,0,0,0], p:2,b:'s'},
+  {Z:5, s:'B',  n:'Boron',      m:10.81, cfg:[2,2,1,0,0,0,0,0], p:2,b:'p'},
+  {Z:6, s:'C',  n:'Carbon',     m:12.01, cfg:[2,2,2,0,0,0,0,0], p:2,b:'p'},
+  {Z:7, s:'N',  n:'Nitrogen',   m:14.01, cfg:[2,2,3,0,0,0,0,0], p:2,b:'p'},
+  {Z:8, s:'O',  n:'Oxygen',     m:16.00, cfg:[2,2,4,0,0,0,0,0], p:2,b:'p'},
+  {Z:9, s:'F',  n:'Fluorine',   m:19.00, cfg:[2,2,5,0,0,0,0,0], p:2,b:'p'},
+  {Z:10,s:'Ne', n:'Neon',       m:20.18, cfg:[2,2,6,0,0,0,0,0], p:2,b:'p'},
+  {Z:11,s:'Na', n:'Sodium',     m:22.99, cfg:[2,2,6,1,0,0,0,0], p:3,b:'s'},
+  {Z:12,s:'Mg', n:'Magnesium',  m:24.31, cfg:[2,2,6,2,0,0,0,0], p:3,b:'s'},
+  {Z:13,s:'Al', n:'Aluminium',  m:26.98, cfg:[2,2,6,2,1,0,0,0], p:3,b:'p'},
+  {Z:14,s:'Si', n:'Silicon',    m:28.09, cfg:[2,2,6,2,2,0,0,0], p:3,b:'p'},
+  {Z:15,s:'P',  n:'Phosphorus', m:30.97, cfg:[2,2,6,2,3,0,0,0], p:3,b:'p'},
+  {Z:16,s:'S',  n:'Sulfur',     m:32.06, cfg:[2,2,6,2,4,0,0,0], p:3,b:'p'},
+  {Z:17,s:'Cl', n:'Chlorine',   m:35.45, cfg:[2,2,6,2,5,0,0,0], p:3,b:'p'},
+  {Z:18,s:'Ar', n:'Argon',      m:39.95, cfg:[2,2,6,2,6,0,0,0], p:3,b:'p'},
+  {Z:19,s:'K',  n:'Potassium',  m:39.10, cfg:[2,2,6,2,6,0,1,0], p:4,b:'s'},
+  {Z:20,s:'Ca', n:'Calcium',    m:40.08, cfg:[2,2,6,2,6,0,2,0], p:4,b:'s'},
+  {Z:21,s:'Sc', n:'Scandium',   m:44.96, cfg:[2,2,6,2,6,1,2,0], p:4,b:'d'},
+  {Z:22,s:'Ti', n:'Titanium',   m:47.87, cfg:[2,2,6,2,6,2,2,0], p:4,b:'d'},
+  {Z:23,s:'V',  n:'Vanadium',   m:50.94, cfg:[2,2,6,2,6,3,2,0], p:4,b:'d'},
+  {Z:24,s:'Cr', n:'Chromium',   m:52.00, cfg:[2,2,6,2,6,5,1,0], p:4,b:'d'},
+  {Z:25,s:'Mn', n:'Manganese',  m:54.94, cfg:[2,2,6,2,6,5,2,0], p:4,b:'d'},
+  {Z:26,s:'Fe', n:'Iron',       m:55.85, cfg:[2,2,6,2,6,6,2,0], p:4,b:'d'},
+  {Z:27,s:'Co', n:'Cobalt',     m:58.93, cfg:[2,2,6,2,6,7,2,0], p:4,b:'d'},
+  {Z:28,s:'Ni', n:'Nickel',     m:58.69, cfg:[2,2,6,2,6,8,2,0], p:4,b:'d'},
+  {Z:29,s:'Cu', n:'Copper',     m:63.55, cfg:[2,2,6,2,6,10,1,0],p:4,b:'d'},
+  {Z:30,s:'Zn', n:'Zinc',       m:65.38, cfg:[2,2,6,2,6,10,2,0],p:4,b:'d'},
+  {Z:31,s:'Ga', n:'Gallium',    m:69.72, cfg:[2,2,6,2,6,10,2,1],p:4,b:'p'},
+  {Z:32,s:'Ge', n:'Germanium',  m:72.63, cfg:[2,2,6,2,6,10,2,2],p:4,b:'p'},
+  {Z:33,s:'As', n:'Arsenic',    m:74.92, cfg:[2,2,6,2,6,10,2,3],p:4,b:'p'},
+  {Z:34,s:'Se', n:'Selenium',   m:78.96, cfg:[2,2,6,2,6,10,2,4],p:4,b:'p'},
+  {Z:35,s:'Br', n:'Bromine',    m:79.90, cfg:[2,2,6,2,6,10,2,5],p:4,b:'p'},
+  {Z:36,s:'Kr', n:'Krypton',    m:83.80, cfg:[2,2,6,2,6,10,2,6],p:4,b:'p'},
 ];
 
-// Orbital metadata: [name, l, color, shell index]
-const ORBITALS=[
-  {name:'1s',n:1,l:0,shell:0,col:[0,212,255]},   // 0
-  {name:'2s',n:2,l:0,shell:1,col:[80,200,255]},   // 1
-  {name:'2p',n:2,l:1,shell:1,col:[160,100,255]},  // 2
-  {name:'3s',n:3,l:0,shell:2,col:[0,255,180]},    // 3
-  {name:'3p',n:3,l:1,shell:2,col:[80,255,140]},   // 4
-  {name:'3d',n:3,l:2,shell:2,col:[255,180,60]},   // 5
-  {name:'4s',n:4,l:0,shell:3,col:[200,100,255]},  // 6
-  {name:'4p',n:4,l:1,shell:3,col:[255,100,200]},  // 7
+// Orbital metadata: [name, n, l, shell(0-3), color rgb]
+const ORBS=[
+  {name:'1s',n:1,l:0,sh:0,cr:0,cg:212,cb:255},   // 0
+  {name:'2s',n:2,l:0,sh:1,cr:80,cg:200,cb:255},   // 1
+  {name:'2p',n:2,l:1,sh:1,cr:160,cg:96,cb:255},   // 2
+  {name:'3s',n:3,l:0,sh:2,cr:0,cg:255,cb:200},    // 3
+  {name:'3p',n:3,l:1,sh:2,cr:80,cg:255,cb:140},   // 4
+  {name:'3d',n:3,l:2,sh:2,cr:255,cg:180,cb:60},   // 5
+  {name:'4s',n:4,l:0,sh:3,cr:200,cg:96,cb:255},   // 6
+  {name:'4p',n:4,l:1,sh:3,cr:255,cg:100,cb:200},  // 7
 ];
-
-// Shell radii and colors
-const SHELL_R=[44,88,132,175];
+const SHELL_R=[44,86,128,168];
 const SHELL_COL=['#00d4ff','#a060ff','#00ffc8','#ff80c0'];
-const SHELL_NAMES=['K','L','M','N'];
 
-// ═══════════════ CANVAS SETUP ═══════════════
-const canvas=document.getElementById('c');
-const ctx=canvas.getContext('2d');
+// ══════════════════════════════════════════════
+//  CANVAS
+// ══════════════════════════════════════════════
+const ac=document.getElementById('atomcanvas');
+const ctx=ac.getContext('2d');
 let CW,CH;
-
-function resizeCanvas(){
-  const wrap=document.getElementById('canvas-wrap');
-  CW=canvas.width=wrap.clientWidth;
-  CH=canvas.height=wrap.clientHeight;
+function resizeAtom(){
+  const wrap=document.getElementById('canvaswrap');
+  CW=wrap.clientWidth; CH=wrap.clientHeight;
+  ac.width=CW; ac.height=CH;
+  ac.style.width=CW+'px'; ac.style.height=CH+'px';
 }
-resizeCanvas();
-window.addEventListener('resize',resizeCanvas);
+resizeAtom();
+window.addEventListener('resize',resizeAtom);
 
-// ═══════════════ 3D ENGINE ═══════════════
-let rotX=-0.35, rotY=0.5, zoom=1.0, nucZoom=1.0;
-let isDragging=false, dragLast={x:0,y:0};
-
-function rotatePoint(x,y,z){
-  // Rotate Y (left/right spin)
-  let x1=x*Math.cos(rotY)+z*Math.sin(rotY);
-  let z1=-x*Math.sin(rotY)+z*Math.cos(rotY);
-  // Rotate X (tilt up/down)
-  let y2=y*Math.cos(rotX)-z1*Math.sin(rotX);
-  let z2=y*Math.sin(rotX)+z1*Math.cos(rotX);
-  return{x:x1,y:y2,z:z2};
-}
+// ══════════════════════════════════════════════
+//  3D ENGINE
+// ══════════════════════════════════════════════
+let rotX=-0.32, rotY=0.5, zoom=1.0, nucZoom=1.0;
 
 function project(x,y,z){
-  const FOCAL=500;
-  const rp=rotatePoint(x*zoom,y*zoom,z*zoom);
-  const depth=rp.z+700;
-  if(depth<10) return null;
-  const s=FOCAL/depth;
-  return{sx:CW/2+rp.x*s, sy:CH/2+rp.y*s, s, depth:rp.z};
+  // Rotate Y
+  const x1=x*Math.cos(rotY)+z*Math.sin(rotY);
+  const z1=-x*Math.sin(rotY)+z*Math.cos(rotY);
+  // Rotate X
+  const y2=y*Math.cos(rotX)-z1*Math.sin(rotX);
+  const z2=y*Math.sin(rotX)+z1*Math.cos(rotX);
+  // Perspective
+  const depth=z2+700;
+  if(depth<5)return null;
+  const s=500*zoom/depth;
+  return{sx:CW/2+x1*s, sy:CH/2+y2*s, s, depth:z2};
 }
 
-// ═══════════════ PROBABILITY CLOUD PRECOMPUTE ═══════════════
-// Precomputed point clouds per orbital type
-// Using simplified hydrogen-like wavefunctions
-const CLOUD_POINTS=1800;
+// ══════════════════════════════════════════════
+//  CLOUD PRECOMPUTE
+//  Dense point clouds — 4500 pts per orbital type
+// ══════════════════════════════════════════════
+const N_CLOUD=4500;
 const clouds={};
 
-function buildCloud(orbType){
+function buildCloud(oi){
+  const o=ORBS[oi];
+  const n=o.n, l=o.l;
+  const R=SHELL_R[o.sh];
   const pts=[];
-  const n=ORBITALS[orbType].n;
-  const l=ORBITALS[orbType].l;
-  const R=SHELL_R[ORBITALS[orbType].shell];
-
-  for(let attempt=0;attempt<CLOUD_POINTS*8&&pts.length<CLOUD_POINTS;attempt++){
-    // Random spherical coordinates
-    const r=Math.random()*R*1.8;
+  let attempts=0;
+  while(pts.length<N_CLOUD && attempts<N_CLOUD*15){
+    attempts++;
+    const r=Math.random()*R*2.4;
     const theta=Math.acos(2*Math.random()-1);
     const phi=Math.random()*Math.PI*2;
-    const x=r*Math.sin(theta)*Math.cos(phi);
-    const y=r*Math.sin(theta)*Math.sin(phi);
-    const z=r*Math.cos(theta);
-
-    // Radial probability (simplified)
     const rn=r/R;
-    let radProb;
-    if(n===1)      radProb=Math.exp(-2*rn)*rn*rn;
-    else if(n===2 && l===0) radProb=Math.exp(-rn)*(2-rn)*(2-rn)*rn*rn*0.25;
-    else if(n===2 && l===1) radProb=Math.exp(-rn)*rn*rn*rn*rn*0.12;
-    else if(n===3 && l===0) radProb=Math.exp(-0.67*rn)*(3-2*rn+0.2*rn*rn)**2*rn*rn*0.08;
-    else if(n===3 && l===1) radProb=Math.exp(-0.67*rn)*rn*rn*rn*rn*0.06;
-    else if(n===3 && l===2) radProb=Math.exp(-0.67*rn)*rn*rn*rn*rn*rn*rn*0.03;
-    else if(n===4 && l===0) radProb=Math.exp(-0.5*rn)*rn*rn*0.05;
-    else                    radProb=Math.exp(-0.5*rn)*rn*rn*rn*0.04;
 
-    // Angular probability based on l
-    let angProb=1;
+    // Radial wavefunction (simplified hydrogen-like)
+    let Pr;
+    if(n===1)          Pr=Math.exp(-2*rn)*rn*rn;
+    else if(n===2&&l===0) Pr=Math.exp(-rn)*(2-rn)**2*rn*rn*0.15;
+    else if(n===2&&l===1) Pr=Math.exp(-rn)*rn**4*0.08;
+    else if(n===3&&l===0) Pr=Math.exp(-0.67*rn)*(2.7-1.8*rn+0.2*rn*rn)**2*rn*rn*0.06;
+    else if(n===3&&l===1) Pr=Math.exp(-0.67*rn)*rn**4*0.05;
+    else if(n===3&&l===2) Pr=Math.exp(-0.67*rn)*rn**6*0.025;
+    else if(n===4&&l===0) Pr=Math.exp(-0.5*rn)*rn*rn*0.04;
+    else                   Pr=Math.exp(-0.5*rn)*rn**3*0.03;
+
+    // Angular wavefunction (real spherical harmonics)
+    let Pa=1;
+    const ct=Math.cos(theta),st=Math.sin(theta);
+    const cp=Math.cos(phi),sp=Math.sin(phi);
     if(l===1){
-      // p orbital: dumbbell — two lobes
-      // Mix of px, py, pz
-      const axisChoice=attempt%3;
-      if(axisChoice===0)      angProb=Math.cos(theta)*Math.cos(theta);
-      else if(axisChoice===1) angProb=Math.sin(theta)*Math.sin(theta)*Math.cos(phi)*Math.cos(phi);
-      else                    angProb=Math.sin(theta)*Math.sin(theta)*Math.sin(phi)*Math.sin(phi);
+      // Three p lobes — distribute among px, py, pz
+      const axis=attempts%3;
+      if(axis===0) Pa=ct*ct;                    // pz
+      else if(axis===1) Pa=st*st*cp*cp;         // px
+      else              Pa=st*st*sp*sp;          // py
+      Pa=Pa*3;
     } else if(l===2){
-      // d orbital: clover-like
-      angProb=Math.sin(theta)*Math.sin(theta)*Math.cos(theta)*Math.cos(theta)*
-               (1+Math.cos(2*phi))*0.5+0.1;
+      // d orbitals — mix of shapes
+      const f=attempts%5;
+      if(f===0)       Pa=(3*ct*ct-1)**2*0.25;   // dz2
+      else if(f===1)  Pa=st*st*ct*ct*cp*cp*4;   // dxz
+      else if(f===2)  Pa=st*st*ct*ct*sp*sp*4;   // dyz
+      else if(f===3)  Pa=st**4*(cp*cp-sp*sp)**2*3; // dx2-y2
+      else            Pa=st**4*cp*cp*sp*sp*4;    // dxy
     } else if(l===3){
-      // f orbital: complex
-      angProb=Math.abs(Math.cos(3*phi))*Math.sin(theta)**3*Math.cos(theta)**2+0.05;
+      const f=attempts%3;
+      if(f===0)      Pa=Math.abs(Math.cos(3*phi))*st**3;
+      else if(f===1) Pa=ct*ct*st*st;
+      else           Pa=Math.abs(Math.cos(2*phi))*st**2*ct*ct;
+      Pa*=2;
     }
 
-    const prob=radProb*angProb;
-    if(Math.random()<prob*6){
-      pts.push({x,y,z});
+    const prob=Pr*Pa;
+    if(Math.random()<Math.min(1,prob*8)){
+      pts.push({
+        x:r*st*cp,
+        y:r*st*sp,
+        z:r*ct
+      });
     }
   }
   return pts;
 }
 
-// Build all clouds
 for(let i=0;i<8;i++) clouds[i]=buildCloud(i);
 
-// ═══════════════ ORBITAL SHAPE PRECOMPUTE ═══════════════
-// 3D lobe shapes for orbital shapes mode
-function buildOrbitalShape(orbType){
-  const l=ORBITALS[orbType].l;
-  const R=SHELL_R[ORBITALS[orbType].shell]*1.3;
+// Orbital shape clouds (denser, more structured)
+const N_SHAPE=3000;
+const shapes={};
+function buildShape(oi){
+  const o=ORBS[oi];
+  const l=o.l;
+  const R=SHELL_R[o.sh]*1.25;
   const pts=[];
-  const N=600;
-
-  for(let i=0;i<N;i++){
+  for(let k=0;k<N_SHAPE;k++){
     const theta=Math.acos(2*Math.random()-1);
     const phi=Math.random()*Math.PI*2;
-
+    const ct=Math.cos(theta),st=Math.sin(theta);
+    const cp=Math.cos(phi),sp=Math.sin(phi);
     let r;
     if(l===0){
-      // s: sphere
       r=R*0.55;
     } else if(l===1){
-      // p: dumbbell (three lobes along x,y,z)
-      const ax=i%3;
-      const lobe=ax===0?Math.abs(Math.cos(theta)):
-                 ax===1?Math.abs(Math.sin(theta)*Math.cos(phi)):
-                         Math.abs(Math.sin(theta)*Math.sin(phi));
-      r=R*0.7*lobe;
+      const ax=k%3;
+      const lobe=ax===0?Math.abs(ct):ax===1?Math.abs(st*cp):Math.abs(st*sp);
+      r=R*0.68*(lobe+0.05);
     } else if(l===2){
-      // d: four-lobe clover + ring
-      const lobe=Math.sin(theta)*Math.sin(theta)*Math.abs(Math.cos(2*phi));
-      r=R*0.65*(lobe+0.15);
+      const ax=k%5;
+      let lobe;
+      if(ax===0)      lobe=(3*ct*ct-1)**2*0.05;
+      else if(ax===1) lobe=st*st*ct*ct*(cp*cp+0.05);
+      else if(ax===2) lobe=st*st*ct*ct*(sp*sp+0.05);
+      else if(ax===3) lobe=st**4*(cp**2-sp**2)**2*0.25+0.05;
+      else            lobe=st**4*cp*cp*sp*sp+0.05;
+      r=R*0.65*(Math.sqrt(lobe)*3+0.08);
     } else {
-      // f: multi-lobe
-      const lobe=Math.abs(Math.cos(3*phi))*Math.sin(theta)**2;
-      r=R*0.6*(lobe+0.1);
+      const lobe=Math.abs(Math.cos(3*phi))*st**2*0.5+0.08;
+      r=R*0.62*(lobe*2+0.1);
     }
-
-    pts.push({
-      x:r*Math.sin(theta)*Math.cos(phi),
-      y:r*Math.sin(theta)*Math.sin(phi),
-      z:r*Math.cos(theta)
-    });
+    pts.push({x:r*st*cp, y:r*st*sp, z:r*ct});
   }
   return pts;
 }
+for(let i=0;i<8;i++) shapes[i]=buildShape(i);
 
-const orbShapes={};
-for(let i=0;i<8;i++) orbShapes[i]=buildOrbitalShape(i);
-
-// ═══════════════ NUCLEUS PARTICLES ═══════════════
+// ══════════════════════════════════════════════
+//  NUCLEUS
+// ══════════════════════════════════════════════
 function buildNucleus(Z){
-  const N_neutrons=Math.round(Z*1.2);
+  const nNeut=Math.round(Z*1.2);
+  const total=Z+nNeut;
   const nucs=[];
-  const total=Z+N_neutrons;
+  const scale=3.5+Math.cbrt(total)*2;
   for(let i=0;i<total;i++){
-    // Pack in sphere via random
-    let x,y,z,r;
-    let tries=0;
-    do{
-      x=(Math.random()-0.5)*2;
-      y=(Math.random()-0.5)*2;
-      z=(Math.random()-0.5)*2;
-      r=Math.sqrt(x*x+y*y+z*z);
-      tries++;
-    }while(r>1&&tries<20);
-    const scale=4+Math.cbrt(total)*2.2;
-    nucs.push({
-      x:x*scale, y:y*scale, z:z*scale,
-      isProton:i<Z,
-      phase:Math.random()*Math.PI*2,
-      wobble:Math.random()*0.5
-    });
+    let x,y,z;
+    do{x=(Math.random()-.5)*2;y=(Math.random()-.5)*2;z=(Math.random()-.5)*2;}
+    while(x*x+y*y+z*z>1);
+    nucs.push({x:x*scale,y:y*scale,z:z*scale,
+      isP:i<Z, phase:Math.random()*Math.PI*2, wob:Math.random()*0.6});
   }
   return nucs;
 }
 
-// ═══════════════ ELECTRON STATE ═══════════════
-// electrons: {orbIdx, angle, speed, exciteLevel, exciteTimer, colR,colG,colB, shellR, phase3d_theta, phase3d_phi}
+// ══════════════════════════════════════════════
+//  ATOM STATE
+// ══════════════════════════════════════════════
+let curZ=1;
 let electrons=[];
-let nucleusParticles=[];
-let shellVisible=[true,true,true,true];
+let nucParts=[];
+let shellVis=[true,true,true,true];
 let viewMode='bohr';
-let currentZ=1;
-let selectedOrbital=-1;
-let exciteFlash=0;
-let time=0;
-
-// Spectral lines accumulated
+let simTime=0;
+let excFlash=0;
 let specLines=[];
+let selOrb=-1;
 
 function buildAtom(Z){
   electrons=[];
-  nucleusParticles=buildNucleus(Z);
-  const el=ELEMENTS[Z-1];
-  const cfg=el.cfg;
-
-  // For each orbital slot, create electron objects
-  const orbOrder=[0,1,2,3,4,5,6,7]; // 1s,2s,2p,3s,3p,3d,4s,4p
+  nucParts=buildNucleus(Z);
+  const el=ELS[Z-1];
   for(let oi=0;oi<8;oi++){
-    const count=cfg[oi];
-    const orb=ORBITALS[oi];
-    for(let e=0;e<count;e++){
-      // Distribute electrons around shell orbit
-      const totalInOrb=cfg[oi];
-      const angle=(e/totalInOrb)*Math.PI*2;
-      // 3D orbit tilt angles
-      const tiltTheta=(orb.l>0?e/Math.max(1,totalInOrb-1)*Math.PI:0);
-      const tiltPhi=oi*1.1+e*0.6;
-      const [cr,cg,cb]=orb.col;
+    const cnt=el.cfg[oi];
+    if(!cnt)continue;
+    const o=ORBS[oi];
+    for(let e=0;e<cnt;e++){
       electrons.push({
-        orbIdx:oi,
-        angle:angle,
-        speed:(0.8+Math.random()*0.4)/(orb.n*orb.n)*2.5,
-        exciteLevel:0,
-        exciteTimer:0,
-        cr,cg,cb,
-        shellR:SHELL_R[orb.shell],
-        tiltTheta,
-        tiltPhi,
-        phase:Math.random()*Math.PI*2
+        oi, angle:e/cnt*Math.PI*2,
+        speed:(0.7+Math.random()*0.5)/(o.n*o.n)*2.8,
+        tT:e*Math.PI/Math.max(1,cnt), tP:oi*1.1+e*0.65,
+        excLvl:0, excTimer:0
       });
     }
   }
 }
 
-// ═══════════════ ELECTRON POSITION ═══════════════
-function electronPos(e,t){
-  const orb=ORBITALS[e.orbIdx];
-  const sr=e.shellR*(1+e.exciteLevel*0.35);
-  // 3D tilted orbit
+function electronPos3D(e,t){
+  const o=ORBS[e.oi];
+  const sr=SHELL_R[o.sh]*(1+e.excLvl*0.35);
   const ang=e.angle+t*e.speed;
-  // Orbit in XZ plane, then tilt
-  const lx=sr*Math.cos(ang);
-  const lz=sr*Math.sin(ang);
-  const ly=0;
-  // Apply tilt
-  const ct=Math.cos(e.tiltTheta), st=Math.sin(e.tiltTheta);
-  const cp=Math.cos(e.tiltPhi),   sp=Math.sin(e.tiltPhi);
-  const x=lx*cp - lz*st*sp;
-  const y=lx*sp + lz*st*cp + ly*ct;
-  const z=lz*ct;
-  return{x,y,z};
+  const lx=sr*Math.cos(ang), lz=sr*Math.sin(ang);
+  const ct=Math.cos(e.tT),st=Math.sin(e.tT);
+  const cp=Math.cos(e.tP),sp=Math.sin(e.tP);
+  return{x:lx*cp-lz*st*sp, y:lx*sp+lz*st*cp, z:lz*ct};
 }
 
-// ═══════════════ DRAW NUCLEUS ═══════════════
+// ══════════════════════════════════════════════
+//  DRAW FUNCTIONS
+// ══════════════════════════════════════════════
 function drawNucleus(t){
-  // Scale nucleus by nucZoom slider
   const nz=nucZoom;
-  const nTime=t*0.4;
-
-  // Sort by depth
-  const sorted=nucleusParticles.map(n=>{
-    const wobX=Math.sin(nTime+n.phase)*n.wobble*1.5;
-    const wobY=Math.cos(nTime*1.3+n.phase)*n.wobble*1.5;
-    const p=project((n.x+wobX)*nz,(n.y+wobY)*nz,n.z*nz);
-    return{n,p};
+  const sorted=nucParts.map(np=>{
+    const wx=np.x+Math.sin(t*0.45+np.phase)*np.wob*1.5;
+    const wy=np.y+Math.cos(t*0.6+np.phase)*np.wob*1.5;
+    const p=project(wx*nz,wy*nz,np.z*nz);
+    return{np,p};
   }).filter(x=>x.p).sort((a,b)=>b.p.depth-a.p.depth);
 
-  for(const{n,p}of sorted){
-    const r=Math.max(2,3.5*p.s*nz);
-    if(n.isProton){
-      // Proton: red with glow
-      ctx.globalAlpha=0.15;
-      ctx.fillStyle='#ff4455';
+  for(const{np,p}of sorted){
+    const r=Math.max(1.5,3.2*p.s);
+    if(np.isP){
+      ctx.globalAlpha=0.15;ctx.fillStyle='#ff4455';
+      ctx.beginPath();ctx.arc(p.sx,p.sy,r*2.8,0,Math.PI*2);ctx.fill();
+      ctx.globalAlpha=1;
+      const g=ctx.createRadialGradient(p.sx-r*.3,p.sy-r*.3,0,p.sx,p.sy,r);
+      g.addColorStop(0,'#ff9090');g.addColorStop(1,'#cc2233');
+      ctx.fillStyle=g;
+    } else {
+      ctx.globalAlpha=0.12;ctx.fillStyle='#5a7898';
       ctx.beginPath();ctx.arc(p.sx,p.sy,r*2.5,0,Math.PI*2);ctx.fill();
       ctx.globalAlpha=1;
-      const grd=ctx.createRadialGradient(p.sx-r*0.3,p.sy-r*0.3,0,p.sx,p.sy,r);
-      grd.addColorStop(0,'#ff8888');grd.addColorStop(1,'#cc2233');
-      ctx.fillStyle=grd;
-    } else {
-      // Neutron: blue-grey
-      ctx.globalAlpha=0.12;
-      ctx.fillStyle='#6080a0';
-      ctx.beginPath();ctx.arc(p.sx,p.sy,r*2.2,0,Math.PI*2);ctx.fill();
-      ctx.globalAlpha=1;
-      const grd=ctx.createRadialGradient(p.sx-r*0.3,p.sy-r*0.3,0,p.sx,p.sy,r);
-      grd.addColorStop(0,'#90b0d0');grd.addColorStop(1,'#3a5570');
-      ctx.fillStyle=grd;
+      const g=ctx.createRadialGradient(p.sx-r*.3,p.sy-r*.3,0,p.sx,p.sy,r);
+      g.addColorStop(0,'#90b0d0');g.addColorStop(1,'#3a5570');
+      ctx.fillStyle=g;
     }
     ctx.beginPath();ctx.arc(p.sx,p.sy,r,0,Math.PI*2);ctx.fill();
   }
   ctx.globalAlpha=1;
 }
 
-// ═══════════════ DRAW SHELL RINGS ═══════════════
 function drawShellRings(){
   for(let s=0;s<4;s++){
-    if(!shellVisible[s]) continue;
+    if(!shellVis[s])continue;
     const R=SHELL_R[s];
     const col=SHELL_COL[s];
-    // Draw 3 rings (one in each plane) for 3D effect
-    const planes=[
-      {rx:0,ry:0},
-      {rx:Math.PI/2,ry:0},
-      {rx:0,ry:Math.PI/2},
-    ];
-    for(const pl of planes){
-      const N=64;
-      const pts=[];
-      for(let i=0;i<=N;i++){
-        const a=i/N*Math.PI*2;
-        const lx=R*Math.cos(a);
-        const lz=R*Math.sin(a);
-        // Apply plane tilt
-        const ct=Math.cos(pl.rx),st=Math.sin(pl.rx);
-        const cp=Math.cos(pl.ry),sp=Math.sin(pl.ry);
-        const x=lx*cp;
-        const y=lz*st;
-        const z=lz*ct+lx*sp;
-        const p=project(x,y,z);
-        if(p) pts.push(p);
+    // Draw 3 rings (XZ, YZ, XY planes)
+    const tilts=[[0,0],[Math.PI/2,0],[0,Math.PI/2]];
+    for(const[tx,ty]of tilts){
+      const N=80,pts=[];
+      for(let k=0;k<=N;k++){
+        const a=k/N*Math.PI*2;
+        const lx=R*Math.cos(a), lz=R*Math.sin(a);
+        const ct=Math.cos(tx),st=Math.sin(tx);
+        const cp=Math.cos(ty),sp=Math.sin(ty);
+        const px=lx*cp-lz*st*sp;
+        const py=lx*sp+lz*st*cp;
+        const pz=lz*ct;
+        const p=project(px,py,pz);
+        if(p)pts.push(p);
       }
-      if(pts.length<2) continue;
-      ctx.globalAlpha=0.12;
-      ctx.strokeStyle=col;
-      ctx.lineWidth=1;
+      if(pts.length<2)continue;
+      ctx.globalAlpha=0.13;ctx.strokeStyle=col;ctx.lineWidth=1;
       ctx.beginPath();ctx.moveTo(pts[0].sx,pts[0].sy);
-      for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].sx,pts[i].sy);
+      for(let i=1;i<pts.length;i++)ctx.lineTo(pts[i].sx,pts[i].sy);
       ctx.stroke();
     }
   }
   ctx.globalAlpha=1;
 }
 
-// ═══════════════ DRAW ELECTRONS (BOHR) ═══════════════
 function drawElectronsBohr(t){
-  const sorted=electrons.map((e,i)=>{
-    const pos=electronPos(e,t);
+  const el=ELS[curZ-1];
+  // Collect + depth sort
+  const all=electrons.map((e,i)=>{
+    if(!shellVis[ORBS[e.oi].sh])return null;
+    if(!el.cfg[e.oi])return null;
+    const pos=electronPos3D(e,t);
     const p=project(pos.x,pos.y,pos.z);
+    if(!p)return null;
     return{e,p,i};
-  }).filter(x=>x.p&&shellVisible[ORBITALS[x.e.orbIdx].shell])
-    .sort((a,b)=>b.p.depth-a.p.depth);
+  }).filter(Boolean).sort((a,b)=>b.p.depth-a.p.depth);
 
-  for(const{e,p,i}of sorted){
-    const r=Math.max(2,3*p.s);
-    const bright=e.exciteLevel>0?1.3:1;
-    const cr=Math.min(255,e.cr*bright)|0;
-    const cg=Math.min(255,e.cg*bright)|0;
-    const cb=Math.min(255,e.cb*bright)|0;
-
+  for(const{e,p,i}of all){
+    const o=ORBS[e.oi];
+    const bright=1+e.excLvl*0.5;
+    const cr=Math.min(255,o.cr*bright)|0;
+    const cg=Math.min(255,o.cg*bright)|0;
+    const cb=Math.min(255,o.cb*bright)|0;
+    const r=Math.max(2,3.2*p.s);
     // Glow
-    for(let g=4;g>=1;g--){
-      ctx.globalAlpha=(0.06+e.exciteLevel*0.06)*g;
+    for(let g=5;g>=1;g--){
+      ctx.globalAlpha=(0.06+e.excLvl*0.05)*g;
       ctx.fillStyle=`rgb(${cr},${cg},${cb})`;
-      ctx.beginPath();ctx.arc(p.sx,p.sy,r+g*5,0,Math.PI*2);ctx.fill();
+      ctx.beginPath();ctx.arc(p.sx,p.sy,r+g*5.5,0,Math.PI*2);ctx.fill();
     }
     ctx.globalAlpha=1;
-
-    // Core
     ctx.fillStyle=`rgb(${cr},${cg},${cb})`;
     ctx.beginPath();ctx.arc(p.sx,p.sy,r,0,Math.PI*2);ctx.fill();
-
-    // Excitation arc
-    if(e.exciteLevel>0){
+    // Excitation ring
+    if(e.excLvl>0){
       ctx.strokeStyle=`rgba(${cr},${cg},${cb},0.5)`;
-      ctx.lineWidth=1;
-      ctx.beginPath();
-      ctx.arc(p.sx,p.sy,r+8+e.exciteTimer*15,0,Math.PI*2*e.exciteTimer);
+      ctx.lineWidth=1.5;
+      ctx.beginPath();ctx.arc(p.sx,p.sy,r+8+e.excTimer*18,0,Math.PI*2*(1-e.excTimer*.3));
       ctx.stroke();
     }
   }
   ctx.globalAlpha=1;
 }
 
-// ═══════════════ DRAW QUANTUM CLOUD ═══════════════
-function drawQuantumCloud(t){
-  const el=ELEMENTS[currentZ-1];
+function drawCloud(t){
+  const el=ELS[curZ-1];
+  const ptsAll=[];
   for(let oi=0;oi<8;oi++){
-    if(el.cfg[oi]===0) continue;
-    const orb=ORBITALS[oi];
-    if(!shellVisible[orb.shell]) continue;
-    const pts=clouds[oi];
-    const [cr,cg,cb]=orb.col;
-
-    // Phase animation — "4D" quantum oscillation
-    const phase=Math.sin(t*0.8+oi*0.5)*0.3;
-
-    // Collect + depth sort
-    const projected=pts.map(pt=>{
-      const px=pt.x+Math.sin(t*0.3+oi)*2;
-      const py=pt.y+Math.cos(t*0.4+oi)*2;
-      const pz=pt.z+Math.sin(t*0.5+oi*1.3)*2;
-      return project(px,py,pz);
-    }).filter(Boolean).sort((a,b)=>b.depth-a.depth);
-
-    for(const p of projected){
-      const alpha=(0.3+0.2*p.s+phase)*0.6;
-      const r=Math.max(0.5,1.2*p.s);
-      ctx.globalAlpha=Math.max(0,Math.min(1,alpha));
-      ctx.fillStyle=`rgb(${cr},${cg},${cb})`;
-      ctx.beginPath();ctx.arc(p.sx,p.sy,r,0,Math.PI*2);ctx.fill();
+    if(!el.cfg[oi])continue;
+    const o=ORBS[oi];
+    if(!shellVis[o.sh])continue;
+    const src=clouds[oi];
+    // Phase animation — slight 4D breathing
+    const phase=Math.sin(t*0.7+oi*0.8)*2.5;
+    for(const pt of src){
+      const px=pt.x+Math.sin(t*0.28+oi)*phase;
+      const py=pt.y+Math.cos(t*0.35+oi)*phase;
+      const pz=pt.z+Math.sin(t*0.42+oi*1.3)*phase;
+      const p=project(px,py,pz);
+      if(p)ptsAll.push({p,cr:o.cr,cg:o.cg,cb:o.cb});
     }
+  }
+  // Depth sort for proper 3D layering
+  ptsAll.sort((a,b)=>b.p.depth-a.p.depth);
+  for(const{p,cr,cg,cb}of ptsAll){
+    const r=Math.max(0.5,1.1*p.s);
+    const a=Math.min(0.85,(0.25+0.35*p.s));
+    ctx.globalAlpha=a;
+    ctx.fillStyle=`rgb(${cr},${cg},${cb})`;
+    ctx.beginPath();ctx.arc(p.sx,p.sy,r,0,Math.PI*2);ctx.fill();
   }
   ctx.globalAlpha=1;
 }
 
-// ═══════════════ DRAW ORBITAL SHAPES ═══════════════
 function drawOrbitalShapes(t){
-  const el=ELEMENTS[currentZ-1];
+  const el=ELS[curZ-1];
   for(let oi=0;oi<8;oi++){
-    if(el.cfg[oi]===0) continue;
-    const orb=ORBITALS[oi];
-    if(!shellVisible[orb.shell]) continue;
-    const pts=orbShapes[oi];
-    const [cr,cg,cb]=orb.col;
-
-    // Slow rotation for visual interest
-    const spin=t*0.12*(oi%2===0?1:-1);
-
-    const projected=pts.map(pt=>{
-      const s=Math.sin(spin),c=Math.cos(spin);
-      const rx=pt.x*c-pt.z*s;
-      const rz=pt.x*s+pt.z*c;
-      return project(rx,pt.y,rz);
-    }).filter(Boolean).sort((a,b)=>b.depth-a.depth);
-
-    for(let i=0;i<projected.length;i++){
-      const p=projected[i];
-      const alpha=0.4+0.3*p.s;
-      const r=Math.max(0.8,1.5*p.s);
-      ctx.globalAlpha=Math.min(1,alpha);
+    if(!el.cfg[oi])continue;
+    const o=ORBS[oi];
+    if(!shellVis[o.sh])continue;
+    const src=shapes[oi];
+    const spin=t*0.1*(oi%2===0?1:-1);
+    const cs=Math.cos(spin),ss=Math.sin(spin);
+    const ptsP=[];
+    for(const pt of src){
+      // Slow spin around Y axis
+      const rx=pt.x*cs-pt.z*ss;
+      const rz=pt.x*ss+pt.z*cs;
+      const p=project(rx,pt.y,rz);
+      if(p)ptsP.push({p,cr:o.cr,cg:o.cg,cb:o.cb});
+    }
+    ptsP.sort((a,b)=>b.p.depth-a.p.depth);
+    for(const{p,cr,cg,cb}of ptsP){
+      const r=Math.max(0.8,1.4*p.s);
+      const a=Math.min(1,0.35+0.45*p.s);
+      ctx.globalAlpha=a;
       ctx.fillStyle=`rgb(${cr},${cg},${cb})`;
       ctx.beginPath();ctx.arc(p.sx,p.sy,r,0,Math.PI*2);ctx.fill();
     }
-
-    // Orbital boundary surface (wireframe dots)
   }
   ctx.globalAlpha=1;
 }
 
-// ═══════════════ EMISSION SPECTRUM ═══════════════
-// Hydrogen emission series
-function energyEV(n){return -13.6/(n*n);}
-function emitPhoton(n1,n2){
-  // Energy in eV (emission: n2→n1 where n2>n1)
-  const dE=energyEV(n1)-energyEV(n2); // positive
-  // Wavelength in nm (E=hc/λ → λ=1240/E nm)
-  const lam=1240/dE;
-  return{lam, dE};
+// ══════════════════════════════════════════════
+//  EXCITATION + SPECTRUM
+// ══════════════════════════════════════════════
+function excite(eIdx){
+  const e=electrons[eIdx];
+  if(e.excLvl>0)return;
+  e.excLvl=1;e.excTimer=1.0;
+  excFlash=1;
+  const o=ORBS[e.oi];
+  const n1=o.n, n2=Math.min(n1+1+Math.floor(Math.random()*2),5);
+  const dE=13.6*(1/(n1*n1)-1/(n2*n2));
+  if(dE>0){
+    const lam=1240/dE;
+    if(lam>300&&lam<900){
+      specLines.push({lam,life:1});
+      updateSpectrum();
+      document.getElementById('speclbl').textContent=`${lam.toFixed(0)} nm · ${o.name} → n=${n2}`;
+      selOrb=e.oi;
+      const oo=ORBS[e.oi];
+      document.getElementById('qn').textContent=oo.n;
+      document.getElementById('ql').textContent=oo.l;
+      document.getElementById('qtype').textContent=['s','p','d','f'][oo.l];
+      document.getElementById('qen').textContent=(13.6/(oo.n*oo.n)).toFixed(2);
+    }
+  }
 }
 
-function wavelengthToRGB(lam){
-  // Visible spectrum: 380–700nm
+function lam2rgb(lam){
   let r=0,g=0,b=0;
   if(lam>=380&&lam<440){r=(440-lam)/60;g=0;b=1;}
   else if(lam<490){r=0;g=(lam-440)/50;b=1;}
@@ -741,239 +989,225 @@ function wavelengthToRGB(lam){
   return`rgb(${r*255|0},${g*255|0},${b*255|0})`;
 }
 
-// Convert wavelength to x position in spectrum bar (380-700nm → 0-208px)
-function lamToX(lam){
-  return Math.max(0,Math.min(208,(lam-380)/(700-380)*208));
-}
-
-function drawSpectrum(){
-  const sc=document.getElementById('spec-canvas');
+function updateSpectrum(){
+  const sc=document.getElementById('speccanvas');
   const sctx=sc.getContext('2d');
-  sctx.clearRect(0,0,208,28);
-
-  // Rainbow background
-  const grd=sctx.createLinearGradient(0,0,208,0);
-  const colors=['#380060','#0000ff','#00aaff','#00ff80','#aaff00','#ffff00','#ff8800','#ff0000'];
-  colors.forEach((c,i)=>grd.addColorStop(i/(colors.length-1),c));
-  sctx.globalAlpha=0.25;
-  sctx.fillStyle=grd;
-  sctx.fillRect(0,0,208,28);
+  const W=sc.width,H=sc.height;
+  sctx.clearRect(0,0,W,H);
+  // Background rainbow
+  const grd=sctx.createLinearGradient(0,0,W,0);
+  ['#200040','#0000ff','#00aaff','#00ff80','#aaff00','#ffff00','#ff8000','#ff0000']
+    .forEach((c,i,a)=>grd.addColorStop(i/(a.length-1),c));
+  sctx.globalAlpha=0.22;sctx.fillStyle=grd;sctx.fillRect(0,0,W,H);
   sctx.globalAlpha=1;
-
-  // Emission lines
+  // Lines
   for(const sl of specLines){
-    const x=lamToX(sl.lam);
-    sctx.strokeStyle=wavelengthToRGB(sl.lam);
-    sctx.globalAlpha=sl.life;
+    const x=Math.max(0,Math.min(W,(sl.lam-380)/(700-380)*W));
+    sctx.strokeStyle=lam2rgb(sl.lam);
+    sctx.globalAlpha=Math.min(1,sl.life*1.2);
     sctx.lineWidth=2;
-    sctx.beginPath();sctx.moveTo(x,0);sctx.lineTo(x,28);sctx.stroke();
+    sctx.beginPath();sctx.moveTo(x,0);sctx.lineTo(x,H);sctx.stroke();
   }
   sctx.globalAlpha=1;
 }
 
-// ═══════════════ EXCITE ELECTRON ═══════════════
-function exciteElectron(eIdx){
-  const e=electrons[eIdx];
-  if(e.exciteLevel>0) return; // already excited
-  e.exciteLevel=1;
-  e.exciteTimer=1.0;
-  exciteFlash=1;
-
-  // Emit photon based on shell transition
-  const n1=ORBITALS[e.orbIdx].n;
-  const n2=Math.min(n1+1+Math.floor(Math.random()*2),4);
-  if(n2>n1){
-    const{lam}=emitPhoton(n1,n2);
-    if(lam>0&&lam<900){
-      specLines.push({lam,life:1});
-      document.getElementById('spec-label').textContent=
-        `Emission: ${lam.toFixed(0)} nm · ${ORBITALS[e.orbIdx].name} → n=${n2}`;
-    }
-  }
-
-  // Update quantum numbers panel
-  const orb=ORBITALS[e.orbIdx];
-  document.getElementById('qn-n').textContent=orb.n;
-  document.getElementById('qn-l').textContent=orb.l;
-  document.getElementById('qn-ml').textContent='0';
-  document.getElementById('qn-type').textContent=['s','p','d','f'][orb.l];
-  document.getElementById('qn-energy').textContent=(energyEV(orb.n)/currentZ).toFixed(2);
-}
-
-// ═══════════════ UPDATE ═══════════════
-function updateAtom(dt){
-  time+=dt;
-  // Electron angles
+// ══════════════════════════════════════════════
+//  UPDATE
+// ══════════════════════════════════════════════
+function update(dt){
+  simTime+=dt;
   for(const e of electrons){
     e.angle+=e.speed*dt*2;
-    if(e.exciteTimer>0){
-      e.exciteTimer-=dt*0.8;
-      if(e.exciteTimer<=0){e.exciteTimer=0;e.exciteLevel=0;}
-    }
+    if(e.excTimer>0){e.excTimer-=dt*0.7;if(e.excTimer<=0){e.excTimer=0;e.excLvl=0;}}
   }
-  // Spectrum line decay
-  for(const sl of specLines) sl.life-=dt*0.15;
+  for(const sl of specLines)sl.life-=dt*0.12;
   specLines=specLines.filter(sl=>sl.life>0);
-  exciteFlash=Math.max(0,exciteFlash-dt*3);
+  excFlash=Math.max(0,excFlash-dt*3);
 }
 
-// ═══════════════ RENDER ═══════════════
-function drawScene(){
-  // Background
-  ctx.fillStyle='#02040a';
-  ctx.fillRect(0,0,CW,CH);
-
-  // Ambient center glow
-  const grd=ctx.createRadialGradient(CW/2,CH/2,0,CW/2,CH/2,250*zoom);
-  grd.addColorStop(0,'rgba(0,60,120,0.12)');
-  grd.addColorStop(1,'rgba(0,0,0,0)');
-  ctx.fillStyle=grd;ctx.fillRect(0,0,CW,CH);
-
-  // Excitation flash
-  if(exciteFlash>0){
-    ctx.fillStyle=`rgba(255,220,100,${exciteFlash*0.15})`;
-    ctx.fillRect(0,0,CW,CH);
-  }
-
-  drawShellRings();
-
-  if(viewMode==='bohr'){
-    drawNucleus(time);
-    drawElectronsBohr(time);
-  }else if(viewMode==='cloud'){
-    drawNucleus(time);
-    drawQuantumCloud(time);
-  }else{
-    drawNucleus(time);
-    drawOrbitalShapes(time);
-  }
-
-  drawSpectrum();
-}
-
-// ═══════════════ MAIN LOOP ═══════════════
-let fpsSmooth=60, lastT=performance.now();
+// ══════════════════════════════════════════════
+//  RENDER
+// ══════════════════════════════════════════════
+let fpsSmooth=60,lastT=performance.now();
 
 function frame(now){
-  const dt=Math.min((now-lastT)/1000,0.05); lastT=now;
-  const iFPS=dt>0?1/dt:60; fpsSmooth+=(iFPS-fpsSmooth)*(dt/0.5);
+  const dt=Math.min((now-lastT)/1000,0.05);lastT=now;
+  const iFPS=dt>0?1/dt:60;fpsSmooth+=(iFPS-fpsSmooth)*(dt/0.5);
 
-  updateAtom(dt);
-  drawScene();
+  if(document.getElementById('psim').classList.contains('on')){
+    update(dt);
 
-  const fps=fpsSmooth+0.5|0;
-  const fe=document.getElementById('fps');
-  fe.textContent=fps+' FPS';
-  fe.style.color=fps>=55?'#3affa0':fps>=30?'#ffb84d':'#ff5566';
+    // Clear
+    ctx.fillStyle='#02040a';ctx.fillRect(0,0,CW,CH);
+    // Ambient
+    const g=ctx.createRadialGradient(CW/2,CH/2,0,CW/2,CH/2,260*zoom);
+    g.addColorStop(0,'rgba(0,40,100,0.1)');g.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=g;ctx.fillRect(0,0,CW,CH);
+    // Excitation flash
+    if(excFlash>0){ctx.fillStyle=`rgba(255,210,80,${(excFlash*0.14).toFixed(2)})`;ctx.fillRect(0,0,CW,CH);}
+
+    drawShellRings();
+    if(viewMode==='bohr'){drawNucleus(simTime);drawElectronsBohr(simTime);}
+    else if(viewMode==='cloud'){drawNucleus(simTime);drawCloud(simTime);}
+    else{drawNucleus(simTime);drawOrbitalShapes(simTime);}
+
+    // FPS
+    const fps=fpsSmooth+0.5|0;
+    const fe=document.getElementById('fps');
+    fe.textContent=fps+' FPS';
+    fe.style.color=fps>=55?'#3affa0':fps>=30?'#ffb84d':'#ff5566';
+
+    // Excitation flash div
+    document.getElementById('excflash').style.background=
+      excFlash>0?`rgba(255,200,80,${(excFlash*0.14).toFixed(2)})`:'rgba(0,0,0,0)';
+  }
 
   requestAnimationFrame(frame);
 }
 
-// ═══════════════ UI ═══════════════
-function changeElement(dir){
-  currentZ=Math.max(1,Math.min(36,currentZ+dir));
-  loadElement(currentZ);
+// ══════════════════════════════════════════════
+//  UI FUNCTIONS
+// ══════════════════════════════════════════════
+function changeEl(dir){
+  curZ=Math.max(1,Math.min(36,curZ+dir));
+  loadElement(curZ);
 }
 
 function loadElement(Z){
-  const el=ELEMENTS[Z-1];
+  const el=ELS[Z-1];
+  curZ=Z;
   buildAtom(Z);
   specLines=[];
-
-  // Update panel
-  document.getElementById('el-sym').textContent=el.sym;
-  document.getElementById('el-z').textContent=`Z = ${Z}`;
-  document.getElementById('el-name').textContent=el.name;
-  document.getElementById('el-mass').textContent=el.mass.toFixed(3)+' u';
-  document.getElementById('el-period').textContent=el.period;
-  document.getElementById('el-block').textContent=el.block+'-block';
-  document.getElementById('n-protons').textContent=Z;
-  document.getElementById('n-neutrons').textContent=Math.round(Z*1.2);
-  document.getElementById('spec-label').textContent='Click an electron to excite → emission';
-
-  // Electron config string
-  const cfgNames=['1s','2s','2p','3s','3p','3d','4s','4p'];
-  const sups=['⁰','¹','²','³','⁴','⁵','⁶','⁷','⁸','⁹','¹⁰'];
+  updateSpectrum();
+  document.getElementById('elsym').textContent=el.s;
+  document.getElementById('elz').textContent=`Z = ${Z}`;
+  document.getElementById('elname').textContent=el.n;
+  document.getElementById('elmass').textContent=el.m.toFixed(3)+' u';
+  document.getElementById('elper').textContent=el.p;
+  document.getElementById('elblk').textContent=el.b+'-block';
+  document.getElementById('nprot').textContent=Z;
+  document.getElementById('nneut').textContent=Math.round(Z*1.2);
+  document.getElementById('speclbl').textContent='Click electron to excite → emission';
+  document.getElementById('qn').textContent='—';
+  document.getElementById('ql').textContent='—';
+  document.getElementById('qtype').textContent='—';
+  document.getElementById('qen').textContent='—';
+  // Config string
+  const names=['1s','2s','2p','3s','3p','3d','4s','4p'];
+  const sup=['⁰','¹','²','³','⁴','⁵','⁶','⁷','⁸','⁹','¹⁰'];
   let cfgStr='';
-  el.cfg.forEach((n,i)=>{if(n>0)cfgStr+=cfgNames[i]+(sups[n]||n)+' ';});
-  document.getElementById('el-config').textContent=cfgStr.trim();
-  document.getElementById('click-hint').style.opacity='0';
+  el.cfg.forEach((n,i)=>{if(n>0)cfgStr+=names[i]+(sup[n]||n)+' ';});
+  document.getElementById('elcfg').textContent=cfgStr.trim();
 }
 
-function setMode(mode){
-  viewMode=mode;
-  document.querySelectorAll('.mode-btn').forEach(b=>{
-    b.classList.toggle('active',b.dataset.mode===mode);
+function setMode(m){
+  viewMode=m;
+  ['bohr','cloud','orbital'].forEach(n=>{
+    const b=document.getElementById('m'+n);
+    if(b)b.classList.toggle('on',n===m);
   });
 }
 
-document.querySelectorAll('.shell-btn').forEach((btn,i)=>{
-  btn.addEventListener('click',()=>{
-    shellVisible[i]=!shellVisible[i];
-    btn.classList.toggle('on',shellVisible[i]);
-  });
-});
+function toggleShell(s){
+  shellVis[s]=!shellVis[s];
+  document.getElementById('sh'+s).classList.toggle('on',shellVis[s]);
+}
 
-// ═══════════════ INPUT ═══════════════
-// Drag to rotate
-document.getElementById('canvas-wrap').addEventListener('mousedown',e=>{
-  isDragging=true;dragLast={x:e.clientX,y:e.clientY};
-});
-window.addEventListener('mouseup',()=>{isDragging=false;});
-window.addEventListener('mousemove',e=>{
-  if(!isDragging) return;
-  const dx=e.clientX-dragLast.x, dy=e.clientY-dragLast.y;
-  rotY+=dx*0.008; rotX+=dy*0.008;
-  rotX=Math.max(-Math.PI/2,Math.min(Math.PI/2,rotX));
-  dragLast={x:e.clientX,y:e.clientY};
-});
+// ══════════════════════════════════════════════
+//  INPUT — use canvas getBoundingClientRect
+// ══════════════════════════════════════════════
+let dragging=false, dragLastX=0, dragLastY=0;
 
-// Scroll to zoom
-document.getElementById('canvas-wrap').addEventListener('wheel',e=>{
+function getCanvasPos(e){
+  const r=ac.getBoundingClientRect();
+  return{x:e.clientX-r.left, y:e.clientY-r.top};
+}
+
+ac.addEventListener('mousedown',e=>{
+  dragging=true;
+  dragLastX=e.clientX;dragLastY=e.clientY;
   e.preventDefault();
-  const delta=e.deltaY<0?1:-1;
-  zoom=Math.max(0.3,Math.min(4,zoom+delta*0.1*zoom));
-},{passive:false});
+});
 
-// Click electron to excite
-canvas.addEventListener('click',e=>{
-  if(!isDragging){
-    const rect=canvas.getBoundingClientRect();
-    const mx=e.clientX-rect.left, my=e.clientY-rect.top;
-    let closest=-1, bestD=25;
-    for(let i=0;i<electrons.length;i++){
-      const pos=electronPos(electrons[i],time);
-      const p=project(pos.x,pos.y,pos.z);
-      if(!p) continue;
-      const d=Math.hypot(p.sx-mx,p.sy-my);
-      if(d<bestD){bestD=d;closest=i;}
+window.addEventListener('mouseup',e=>{
+  if(dragging){
+    dragging=false;
+    // If barely moved it was a click — try to excite electron
+    const dx=e.clientX-dragLastX, dy=e.clientY-dragLastY;
+    if(Math.hypot(dx,dy)<6){
+      const pos=getCanvasPos(e);
+      let best=-1,bd=30;
+      for(let i=0;i<electrons.length;i++){
+        const pos3=electronPos3D(electrons[i],simTime);
+        const p=project(pos3.x,pos3.y,pos3.z);
+        if(!p)continue;
+        const d=Math.hypot(p.sx-pos.x,p.sy-pos.y);
+        if(d<bd){bd=d;best=i;}
+      }
+      if(best!==-1)excite(best);
     }
-    if(closest!==-1) exciteElectron(closest);
   }
 });
 
-// Touch rotate
-let touchLast=null;
-canvas.addEventListener('touchstart',e=>{e.preventDefault();touchLast={x:e.touches[0].clientX,y:e.touches[0].clientY};},{passive:false});
-canvas.addEventListener('touchmove',e=>{
-  e.preventDefault();
-  if(!touchLast) return;
-  const dx=e.touches[0].clientX-touchLast.x, dy=e.touches[0].clientY-touchLast.y;
-  rotY+=dx*0.01; rotX+=dy*0.01;
-  touchLast={x:e.touches[0].clientX,y:e.touches[0].clientY};
-},{passive:false});
-canvas.addEventListener('touchend',()=>{touchLast=null;},{passive:false});
-
-// Keyboard element switching
-window.addEventListener('keydown',e=>{
-  if(e.key==='ArrowRight') changeElement(1);
-  if(e.key==='ArrowLeft')  changeElement(-1);
-  if(e.key==='ArrowUp')    changeElement(10);
-  if(e.key==='ArrowDown')  changeElement(-10);
+window.addEventListener('mousemove',e=>{
+  if(!dragging)return;
+  const dx=e.clientX-dragLastX, dy=e.clientY-dragLastY;
+  rotY+=dx*0.009;
+  rotX+=dy*0.009;
+  rotX=Math.max(-Math.PI/2,Math.min(Math.PI/2,rotX));
+  dragLastX=e.clientX;dragLastY=e.clientY;
 });
 
-// ═══════════════ INIT ═══════════════
+ac.addEventListener('wheel',e=>{
+  e.preventDefault();
+  const delta=e.deltaY<0?1:-1;
+  zoom=Math.max(0.25,Math.min(5,zoom+delta*0.1*zoom));
+},{passive:false});
+
+// Touch rotate + zoom
+let touches={};
+ac.addEventListener('touchstart',e=>{
+  e.preventDefault();
+  for(const t of e.changedTouches)touches[t.identifier]={x:t.clientX,y:t.clientY};
+},{passive:false});
+ac.addEventListener('touchmove',e=>{
+  e.preventDefault();
+  if(e.touches.length===1){
+    const t=e.touches[0];
+    const prev=touches[t.identifier];
+    if(prev){rotY+=(t.clientX-prev.x)*0.01;rotX+=(t.clientY-prev.y)*0.01;}
+    touches[t.identifier]={x:t.clientX,y:t.clientY};
+  } else if(e.touches.length===2){
+    const a=e.touches[0],b=e.touches[1];
+    const pA=touches[a.identifier],pB=touches[b.identifier];
+    if(pA&&pB){
+      const dNow=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);
+      const dPrev=Math.hypot(pA.x-pB.x,pA.y-pB.y);
+      zoom=Math.max(0.25,Math.min(5,zoom*(dNow/dPrev)));
+    }
+    touches[a.identifier]={x:a.clientX,y:a.clientY};
+    touches[b.identifier]={x:b.clientX,y:b.clientY};
+  }
+},{passive:false});
+ac.addEventListener('touchend',e=>{
+  for(const t of e.changedTouches)delete touches[t.identifier];
+},{passive:false});
+
+// Keyboard element navigation
+window.addEventListener('keydown',e=>{
+  if(e.key==='ArrowRight'||e.key==='ArrowLeft'){
+    changeEl(e.key==='ArrowRight'?1:-1);e.preventDefault();
+  }
+  if(e.key==='ArrowUp'||e.key==='ArrowDown'){
+    changeEl(e.key==='ArrowUp'?10:-10);e.preventDefault();
+  }
+});
+
+// ══════════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════════
 loadElement(1);
+updateSpectrum();
 requestAnimationFrame(frame);
 </script>
 </body>
