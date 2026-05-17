@@ -4,746 +4,1125 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Gravity Field Simulator</title>
-<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;1,8..60,300&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" crossorigin="anonymous">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" crossorigin="anonymous"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" crossorigin="anonymous" onload="katexReady=true;tryRenderMath();"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
 :root{
-  --bg:#020408;--cyan:#00d4ff;--purple:#8040ff;
-  --magenta:#ff1a8c;--amber:#ffb84d;
-  --ff:'Rajdhani',sans-serif;--fm:'DM Mono',monospace;
+  --bg:#020408;--bg2:#040810;--bg3:#07101e;--bg4:#0b1828;
+  --cyan:#00d4ff;--mag:#ff1a8c;--amb:#ffb84d;--pur:#8040ff;--grn:#3affa0;
+  --text:#c8d6e8;--mid:#506070;--dim:#2a3a50;--bdr:rgba(0,212,255,0.13);
+  --nav-h:52px;--tb-w:130px;
+  --ff:'Rajdhani',sans-serif;--fb:'Source Serif 4',serif;--fm:'DM Mono',monospace;
 }
-html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:#c8d6e8;}
-canvas{display:block;position:fixed;top:0;left:0;}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:var(--fb);}
 
-#ui{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;font-family:var(--ff);}
+/* ── NAV ── */
+nav{position:fixed;top:0;left:0;right:0;height:var(--nav-h);z-index:300;
+  background:rgba(2,4,8,0.95);border-bottom:1px solid var(--bdr);backdrop-filter:blur(12px);
+  display:flex;align-items:center;padding:0 18px;gap:12px;}
+.nlogo{font-family:var(--ff);font-size:15px;font-weight:700;letter-spacing:3px;
+  color:var(--cyan);display:flex;align-items:center;gap:8px;margin-right:auto;}
+.ndot{width:7px;height:7px;border-radius:50%;background:var(--cyan);
+  animation:dot 2.5s ease-in-out infinite;}
+@keyframes dot{0%,100%{opacity:1;transform:scale(1);}50%{opacity:0.4;transform:scale(0.65);}}
+.tabs{display:flex;gap:2px;background:rgba(0,0,0,0.4);border:1px solid var(--bdr);
+  border-radius:7px;padding:3px;}
+.tab{font-family:var(--fm);font-size:11px;letter-spacing:2px;background:none;
+  border:none;color:var(--mid);cursor:pointer;padding:5px 15px;border-radius:5px;
+  transition:all .2s;text-transform:uppercase;}
+.tab:hover{color:var(--text);background:rgba(0,212,255,0.06);}
+.tab.on{background:rgba(0,212,255,0.1);color:var(--cyan);border:1px solid rgba(0,212,255,0.25);}
+.nbadge{margin-left:auto;font-family:var(--fm);font-size:9px;color:var(--dim);
+  background:rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.05);
+  padding:3px 8px;border-radius:4px;letter-spacing:1px;}
 
-/* HUD top-left */
-#hud{
-  position:absolute;top:0;left:0;
-  background:rgba(2,4,8,0.75);backdrop-filter:blur(8px);
-  padding:12px 16px 10px;border-bottom-right-radius:8px;
-  border-right:1px solid rgba(0,212,255,0.15);
-  border-bottom:1px solid rgba(0,212,255,0.15);
-  max-width:calc(100% - 160px);
-}
-#hud h2{font-size:17px;font-weight:700;letter-spacing:3px;color:var(--cyan);margin-bottom:5px;text-transform:uppercase;}
-#hud .ctrl{font-family:var(--fm);font-size:10px;color:#5a7090;line-height:1.9;}
-#hud .ctrl b{color:#8a9ab8;}
+/* ── PANELS ── */
+.panel{position:fixed;top:var(--nav-h);left:0;right:0;bottom:0;display:none;}
+.panel.on{display:block;}
 
-/* Status bar */
-#status{
-  position:absolute;top:96px;left:0;
-  background:rgba(2,4,8,0.65);padding:4px 14px;
-  font-family:var(--fm);font-size:10px;color:#7090b0;
+/* ══════════════ SIMULATE ══════════════ */
+#psim{background:var(--bg);}
+#simcanvas{position:absolute;top:0;left:0;display:block;}
+
+/* HUD overlay — pointer-events:none so canvas gets events */
+#ui{position:absolute;top:0;left:0;right:0;bottom:0;pointer-events:none;}
+
+#hud{position:absolute;top:0;left:0;background:rgba(2,4,8,0.8);
+  backdrop-filter:blur(6px);padding:10px 14px 8px;
+  border-bottom-right-radius:8px;border-right:1px solid var(--bdr);
+  border-bottom:1px solid var(--bdr);max-width:calc(100% - 140px);}
+#hud h2{font-family:var(--ff);font-size:15px;font-weight:700;letter-spacing:3px;
+  color:var(--cyan);margin-bottom:4px;}
+.hctrl{font-family:var(--fm);font-size:10px;color:var(--mid);line-height:1.95;}
+.hctrl b{color:#7a90a8;}
+
+#statbar{position:absolute;top:90px;left:0;
+  background:rgba(2,4,8,0.7);padding:3px 12px;
+  font-family:var(--fm);font-size:10px;color:var(--mid);
   border-bottom-right-radius:5px;
-  border-right:1px solid rgba(0,212,255,0.1);
-  border-bottom:1px solid rgba(0,212,255,0.1);
-}
+  border-right:1px solid rgba(0,212,255,0.07);
+  border-bottom:1px solid rgba(0,212,255,0.07);}
 
-/* FPS */
-#fps{
-  position:absolute;top:8px;right:8px;
-  background:rgba(2,4,8,0.7);border:1px solid rgba(255,255,255,0.07);
-  font-family:var(--fm);font-size:18px;font-weight:500;
-  padding:4px 10px;border-radius:4px;
-}
+#fps{position:absolute;top:6px;right:6px;
+  background:rgba(2,4,8,0.75);border:1px solid rgba(255,255,255,0.07);
+  font-family:var(--fm);font-size:17px;font-weight:500;
+  padding:4px 10px;border-radius:4px;letter-spacing:1px;}
 
-/* Spawn toolbar */
-#toolbar{
-  position:absolute;top:0;right:0;
-  width:130px;height:100%;
-  background:rgba(2,4,8,0.88);
-  border-left:1px solid rgba(0,212,255,0.12);
-  pointer-events:all;
-  display:flex;flex-direction:column;
-}
-.tb-btn{
-  flex:0 0 72px;cursor:pointer;
-  display:flex;flex-direction:column;
-  align-items:center;justify-content:center;gap:5px;
-  border-bottom:1px solid rgba(20,30,50,0.8);
-  position:relative;transition:background 0.15s;
-  user-select:none;
-}
-.tb-btn:hover{background:rgba(0,212,255,0.04);}
-.tb-btn.sel{background:rgba(0,212,255,0.07);}
-.tb-bar{position:absolute;left:0;top:0;width:3px;height:100%;display:none;}
-.tb-btn.sel .tb-bar{display:block;}
-.tb-ico{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;}
-.tb-lbl{font-size:10px;letter-spacing:2px;color:#4a6080;text-transform:uppercase;}
-.tb-btn.sel .tb-lbl{color:#c8d6e8;}
-.tb-hint{font-family:var(--fm);font-size:9px;color:rgba(60,80,110,0.7);}
+#paused-banner{position:absolute;top:6px;left:50%;transform:translateX(-50%);
+  background:rgba(2,4,8,0.85);color:#ff4455;
+  font-family:var(--ff);font-size:18px;font-weight:700;letter-spacing:4px;
+  padding:5px 22px;border-radius:4px;display:none;
+  border:1px solid rgba(255,68,85,0.4);}
+
+/* Toolbar — pointer-events:all so buttons work */
+#toolbar{position:absolute;top:0;right:0;width:var(--tb-w);height:100%;
+  background:rgba(2,4,8,0.92);border-left:1px solid var(--bdr);
+  pointer-events:all;display:flex;flex-direction:column;}
+.tbtn{flex:0 0 70px;cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;
+  border-bottom:1px solid rgba(15,25,45,0.9);position:relative;
+  transition:background .15s;user-select:none;}
+.tbtn:hover{background:rgba(0,212,255,0.05);}
+.tbtn.on{background:rgba(0,212,255,0.08);}
+.tbar{position:absolute;left:0;top:0;width:3px;height:100%;display:none;}
+.tbtn.on .tbar{display:block;}
+.tico{width:28px;height:28px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--ff);font-size:13px;}
+.tlbl{font-family:var(--ff);font-size:9px;letter-spacing:2px;
+  color:var(--mid);text-transform:uppercase;}
+.tbtn.on .tlbl{color:var(--text);}
+.thint{font-family:var(--fm);font-size:9px;color:rgba(50,70,100,0.7);}
 
 /* Info panel */
-#info{
-  position:absolute;bottom:14px;left:10px;
-  background:rgba(2,4,8,0.8);backdrop-filter:blur(8px);
-  border:1px solid rgba(0,212,255,0.2);border-radius:8px;
-  padding:12px 16px;min-width:260px;
-  font-family:var(--fm);font-size:11px;
-}
-#info .info-title{color:var(--cyan);letter-spacing:2px;font-size:10px;margin-bottom:6px;text-transform:uppercase;}
-#info .info-row{color:#5a7090;line-height:2;display:flex;justify-content:space-between;}
-#info .info-row span{color:#c8d6e8;}
-
-/* Paused */
-#paused{
-  position:absolute;top:8px;left:50%;transform:translateX(-50%);
-  background:rgba(2,4,8,0.8);color:#ff4455;
-  font-size:22px;font-weight:700;letter-spacing:4px;
-  padding:6px 24px;border-radius:4px;display:none;
-  border:1px solid rgba(255,68,85,0.4);
-}
+#infopanel{position:absolute;bottom:12px;left:8px;
+  background:rgba(2,4,8,0.85);backdrop-filter:blur(6px);
+  border:1px solid rgba(0,212,255,0.18);border-radius:8px;
+  padding:10px 14px;font-family:var(--fm);font-size:10px;}
+.ipt{color:var(--cyan);letter-spacing:2px;font-size:9px;
+  text-transform:uppercase;margin-bottom:6px;}
+.ipr{color:var(--mid);display:flex;justify-content:space-between;
+  gap:20px;line-height:2;}
+.ipr span{color:var(--text);}
 
 /* Legend */
-#legend{
-  position:absolute;bottom:14px;right:148px;
-  background:rgba(2,4,8,0.75);border:1px solid rgba(255,255,255,0.06);
-  border-radius:6px;padding:10px 14px;
-  font-family:var(--fm);font-size:10px;
-}
-#legend .leg-title{color:#3a5070;letter-spacing:2px;margin-bottom:8px;text-transform:uppercase;}
-.leg-item{display:flex;align-items:center;gap:8px;line-height:2;color:#5a7090;}
-.leg-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+#legend{position:absolute;bottom:12px;right:138px;
+  background:rgba(2,4,8,0.8);border:1px solid rgba(255,255,255,0.06);
+  border-radius:6px;padding:9px 12px;font-family:var(--fm);font-size:10px;}
+.lgt{color:var(--dim);letter-spacing:2px;margin-bottom:7px;text-transform:uppercase;font-size:9px;}
+.lgi{display:flex;align-items:center;gap:7px;line-height:2;color:var(--mid);}
+.lgd{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+
+/* Context menu — pointer-events:all */
+#ctxmenu{position:fixed;background:rgba(4,8,18,0.97);
+  border:1px solid rgba(80,100,160,0.6);border-radius:6px;
+  padding:6px;min-width:145px;display:none;z-index:200;
+  pointer-events:all;backdrop-filter:blur(14px);}
+.cxtit{color:var(--dim);font-family:var(--fm);font-size:9px;
+  letter-spacing:2px;padding:3px 6px 7px;text-transform:uppercase;}
+.cxitem{display:flex;align-items:center;gap:8px;padding:6px 8px;
+  border-radius:4px;cursor:pointer;color:var(--text);
+  font-family:var(--ff);font-size:12px;letter-spacing:1px;
+  transition:background .1s;}
+.cxitem:hover{background:rgba(0,212,255,0.09);}
+.cxdot{width:11px;height:11px;border-radius:50%;flex-shrink:0;}
+
+#flash{position:absolute;inset:0;background:rgba(180,120,255,0);pointer-events:none;}
+
+/* ══════════════ LEARN ══════════════ */
+#plearn{overflow-y:auto;background:var(--bg);
+  scrollbar-width:thin;scrollbar-color:var(--bg4) transparent;}
+#plearn::-webkit-scrollbar{width:5px;}
+#plearn::-webkit-scrollbar-thumb{background:var(--bg4);}
+.lhero{text-align:center;padding:58px 20px 42px;
+  background:radial-gradient(ellipse at 50% 0%,rgba(0,212,255,0.05),transparent 70%);
+  border-bottom:1px solid var(--bdr);}
+.lhero h1{font-family:var(--ff);font-size:clamp(28px,5vw,50px);font-weight:700;
+  letter-spacing:5px;text-transform:uppercase;color:var(--text);margin-bottom:10px;}
+.lhero h1 em{color:var(--cyan);font-style:normal;}
+.lhero p{font-size:16px;font-weight:300;color:var(--mid);
+  max-width:580px;margin:0 auto;line-height:1.7;}
+.ltags{margin-top:16px;display:flex;gap:7px;justify-content:center;flex-wrap:wrap;}
+.ltag{font-family:var(--fm);font-size:9px;padding:3px 11px;border-radius:20px;
+  background:rgba(0,0,0,0.5);border:1px solid var(--bdr);color:var(--cyan);letter-spacing:1px;}
+.lbody{max-width:860px;margin:0 auto;padding:0 20px 80px;}
+
+/* Physics cards */
+.card{margin:28px 0;border:1px solid rgba(255,255,255,0.06);border-radius:10px;
+  overflow:hidden;background:linear-gradient(155deg,rgba(8,16,32,0.92),rgba(4,8,20,0.96));}
+.card-hd{display:flex;align-items:center;gap:12px;padding:15px 20px;
+  border-bottom:1px solid rgba(255,255,255,0.05);position:relative;overflow:hidden;}
+.card-hd::before{content:'';position:absolute;left:0;top:0;width:4px;height:100%;}
+.cc .card-hd::before{background:var(--cyan);}
+.cm .card-hd::before{background:var(--mag);}
+.ca .card-hd::before{background:var(--amb);}
+.cp .card-hd::before{background:var(--pur);}
+.cg .card-hd::before{background:var(--grn);}
+.cnum{font-family:var(--fm);font-size:9px;color:var(--dim);letter-spacing:1px;
+  background:rgba(0,0,0,0.45);border:1px solid rgba(255,255,255,0.06);
+  padding:2px 7px;border-radius:3px;}
+.card-hd h2{font-family:var(--ff);font-size:18px;font-weight:600;
+  letter-spacing:2px;color:var(--text);text-transform:uppercase;flex:1;}
+.badge{font-family:var(--fm);font-size:9px;padding:3px 9px;
+  border-radius:20px;white-space:nowrap;}
+.bdc{background:rgba(0,212,255,0.1);color:var(--cyan);border:1px solid rgba(0,212,255,0.25);}
+.bdm{background:rgba(255,26,140,0.1);color:var(--mag);border:1px solid rgba(255,26,140,0.25);}
+.bda{background:rgba(255,184,77,0.1);color:var(--amb);border:1px solid rgba(255,184,77,0.25);}
+.bdp{background:rgba(128,64,255,0.1);color:var(--pur);border:1px solid rgba(128,64,255,0.25);}
+.bdg{background:rgba(58,255,160,0.1);color:var(--grn);border:1px solid rgba(58,255,160,0.25);}
+.card-bd{padding:20px;}
+.card-bd p{font-size:14.5px;font-weight:300;line-height:1.75;color:var(--mid);margin-bottom:13px;}
+.card-bd p strong{color:var(--text);font-weight:600;}
+.card-bd p em{color:var(--cyan);font-style:normal;}
+.eq{margin:16px 0;padding:13px 17px;background:rgba(0,0,0,0.52);
+  border-radius:6px;border-left:2px solid rgba(0,212,255,0.28);}
+.eqlbl{font-family:var(--fm);font-size:9px;letter-spacing:2px;
+  color:var(--dim);text-transform:uppercase;margin-bottom:9px;}
+.katex-display{margin:0!important;}
+.katex{font-size:1.05em!important;}
+.katex-display{overflow-x:auto;padding:4px 0;}
+.note{display:flex;gap:10px;align-items:flex-start;border-radius:6px;
+  padding:11px 14px;margin:13px 0;}
+.nc{border-left:2px solid var(--cyan);background:rgba(0,212,255,0.04);}
+.na{border-left:2px solid var(--amb);background:rgba(255,184,77,0.04);}
+.nm{border-left:2px solid var(--mag);background:rgba(255,26,140,0.04);}
+.np{border-left:2px solid var(--pur);background:rgba(128,64,255,0.04);}
+.nico{font-size:14px;margin-top:1px;flex-shrink:0;}
+.note p{font-size:12.5px;line-height:1.65;color:var(--text);margin:0;}
+.note p code{font-family:var(--fm);font-size:10px;background:rgba(0,0,0,0.45);
+  padding:1px 5px;border-radius:3px;color:var(--cyan);}
+
+/* Demo canvas */
+.democanv{margin:16px 0;border:1px solid var(--bdr);border-radius:8px;
+  overflow:hidden;background:rgba(0,0,0,0.65);}
+.demolbl{font-family:var(--fm);font-size:9px;letter-spacing:2px;color:var(--mid);
+  padding:7px 13px;border-bottom:1px solid var(--bdr);
+  background:rgba(0,0,0,0.4);text-transform:uppercase;
+  display:flex;justify-content:space-between;align-items:center;}
+.democap{font-family:var(--fm);font-size:9px;color:var(--dim);
+  padding:7px 13px;border-top:1px solid var(--bdr);background:rgba(0,0,0,0.3);}
+.democapt{color:var(--cyan);font-size:9px;}
+
+/* Controls table */
+.ctrltbl{width:100%;border-collapse:collapse;font-family:var(--fm);font-size:11px;margin-top:10px;}
+.ctrltbl th{background:rgba(0,212,255,0.08);color:var(--cyan);font-weight:600;
+  letter-spacing:2px;text-transform:uppercase;padding:8px 13px;
+  text-align:left;border-bottom:2px solid rgba(0,212,255,0.18);}
+.ctrltbl td{padding:7px 13px;border-bottom:1px solid rgba(255,255,255,0.04);color:var(--mid);}
+.ctrltbl tr:hover td{background:rgba(0,212,255,0.025);}
+.ctrltbl td:first-child{color:var(--cyan);}
+.div{height:1px;background:linear-gradient(90deg,transparent,var(--bdr),transparent);margin:24px 0;}
+
+/* ══════════════ CODE ══════════════ */
+#pcode{overflow-y:auto;background:var(--bg);
+  scrollbar-width:thin;scrollbar-color:var(--bg4) transparent;}
+.chero{text-align:center;padding:50px 20px 34px;
+  background:radial-gradient(ellipse at 50% 0%,rgba(255,26,140,0.05),transparent 70%);
+  border-bottom:1px solid var(--bdr);margin-bottom:32px;}
+.chero h1{font-family:var(--ff);font-size:clamp(24px,4vw,42px);font-weight:700;
+  letter-spacing:5px;text-transform:uppercase;color:var(--text);margin-bottom:9px;}
+.chero h1 em{color:var(--mag);font-style:normal;}
+.chero p{font-size:14px;font-weight:300;color:var(--mid);
+  max-width:520px;margin:0 auto;line-height:1.7;}
+.csect{max-width:860px;margin:0 auto;padding:0 20px 80px;}
+.ablk{margin:24px 0;}
+.atitle{font-family:var(--ff);font-size:14px;letter-spacing:2px;color:var(--text);
+  text-transform:uppercase;display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.albl{font-family:var(--fm);font-size:9px;background:rgba(255,26,140,0.1);
+  color:var(--mag);border:1px solid rgba(255,26,140,0.3);
+  padding:2px 9px;border-radius:20px;letter-spacing:1px;}
+pre{background:rgba(0,0,0,0.72);border:1px solid rgba(255,255,255,0.07);
+  border-radius:8px;padding:16px;font-family:var(--fm);font-size:11px;
+  line-height:1.85;color:var(--mid);overflow-x:auto;scrollbar-width:thin;}
+.kw{color:var(--cyan);}.fn{color:var(--amb);}.cm{color:var(--dim);font-style:italic;}
+.num{color:var(--grn);}.op{color:var(--pur);}
+.ctab{width:100%;border-collapse:collapse;font-family:var(--fm);font-size:11px;margin:14px 0;}
+.ctab th{background:rgba(0,212,255,0.08);color:var(--cyan);font-weight:600;
+  letter-spacing:2px;text-transform:uppercase;padding:8px 13px;
+  text-align:left;border-bottom:2px solid rgba(0,212,255,0.18);}
+.ctab td{padding:8px 13px;border-bottom:1px solid rgba(255,255,255,0.04);color:var(--mid);}
+.ctab tr:hover td{background:rgba(0,212,255,0.02);}
+.ctab td:first-child{color:var(--text);}
+.tg{color:var(--grn)!important;}.to{color:var(--amb)!important;}.tb{color:#ff5566!important;}
 </style>
 </head>
 <body>
-<canvas id="c"></canvas>
-<div id="ui">
-  <div id="hud">
-    <h2>⬡ Gravity Field Simulator</h2>
-    <div class="ctrl"><b>LMB drag</b>: spawn body &nbsp;·&nbsp; <b>RMB drag</b>: pan &nbsp;·&nbsp; <b>Scroll</b>: zoom &nbsp;·&nbsp; <b>Click body</b>: select</div>
-    <div class="ctrl"><b>SPACE</b>: pause &nbsp;·&nbsp; <b>C</b>: clear &nbsp;·&nbsp; <b>R</b>: reset &nbsp;·&nbsp; <b>T</b>: shoot test particle &nbsp;·&nbsp; <b>W</b>: toggle waves &nbsp;·&nbsp; <b>G</b>: grid detail</div>
-  </div>
-  <div id="status">Bodies: 0 · Zoom: 1.00x · Waves: ON</div>
-  <div id="fps" style="color:#3affa0">60 FPS</div>
-  <div id="paused">PAUSED</div>
 
-  <div id="toolbar">
-    <div class="tb-btn sel" data-mode="0">
-      <div class="tb-bar" style="background:#4af"></div>
-      <div class="tb-ico" style="background:rgba(40,120,255,0.25);border:2px solid #4af;color:#4af">P</div>
-      <div class="tb-lbl">Planet</div>
-      <div class="tb-hint">[1]</div>
+<!-- NAV -->
+<nav>
+  <div class="nlogo"><span class="ndot"></span>Gravity Field Simulator</div>
+  <div class="tabs" style="margin:0 auto;">
+    <button class="tab on" onclick="switchTab('sim')">⬡ Simulate</button>
+    <button class="tab" onclick="switchTab('learn')">∑ Learn</button>
+    <button class="tab" onclick="switchTab('code')">&lt;/&gt; Code</button>
+  </div>
+  <div class="nbadge">Space-Time · N-body · Verlet</div>
+</nav>
+
+<!-- ══ SIMULATE ══ -->
+<div id="psim" class="panel on">
+  <canvas id="simcanvas"></canvas>
+  <div id="ui">
+    <div id="hud">
+      <h2>⬡ Gravity Field</h2>
+      <div class="hctrl"><b>LMB drag</b>: spawn · <b>RMB drag</b>: pan · <b>Scroll</b>: zoom · <b>LMB click body</b>: select</div>
+      <div class="hctrl"><b>Space</b>: pause · <b>C</b>: clear · <b>R</b>: reset · <b>T</b>: shoot particle · <b>W</b>: waves · <b>G</b>: grid · <b>1/2/3</b>: type</div>
     </div>
-    <div class="tb-btn" data-mode="1">
-      <div class="tb-bar" style="background:#ffdc50"></div>
-      <div class="tb-ico" style="background:rgba(255,200,60,0.2);border:2px solid #ffdc50;color:#ffdc50">★</div>
-      <div class="tb-lbl">Star</div>
-      <div class="tb-hint">[2]</div>
-    </div>
-    <div class="tb-btn" data-mode="2">
-      <div class="tb-bar" style="background:#ff1a8c"></div>
-      <div class="tb-ico" style="background:rgba(140,20,80,0.3);border:2px solid #ff1a8c;position:relative;">
-        <div style="width:8px;height:8px;border-radius:50%;background:#000;position:absolute;z-index:1"></div>
-        <div style="width:22px;height:22px;border-radius:50%;background:rgba(255,26,140,0.15);position:absolute"></div>
+    <div id="statbar">Bodies: 0 · Zoom: 1.00× · Waves: ON</div>
+    <div id="fps" style="color:#3affa0">60 FPS</div>
+    <div id="paused-banner">PAUSED</div>
+    <div id="toolbar">
+      <div class="tbtn on" id="tb0" onclick="setSpawn(0)">
+        <div class="tbar" style="background:#64b4ff"></div>
+        <div class="tico" style="background:rgba(40,120,255,0.18);border:2px solid #64b4ff;color:#64b4ff">P</div>
+        <div class="tlbl">Planet</div><div class="thint">[1]</div>
       </div>
-      <div class="tb-lbl">Singularity</div>
-      <div class="tb-hint">[3]</div>
+      <div class="tbtn" id="tb1" onclick="setSpawn(1)">
+        <div class="tbar" style="background:#ffdc50"></div>
+        <div class="tico" style="background:rgba(255,210,50,0.16);border:2px solid #ffdc50;color:#ffdc50;font-size:16px">★</div>
+        <div class="tlbl">Star</div><div class="thint">[2]</div>
+      </div>
+      <div class="tbtn" id="tb2" onclick="setSpawn(2)">
+        <div class="tbar" style="background:#ff1a8c"></div>
+        <div class="tico" style="background:rgba(140,10,70,0.3);border:2px solid #ff1a8c;position:relative;">
+          <div style="width:9px;height:9px;border-radius:50%;background:#000;position:absolute;z-index:1"></div>
+          <div style="width:24px;height:24px;border-radius:50%;background:rgba(255,26,140,0.12);position:absolute"></div>
+        </div>
+        <div class="tlbl">Singularity</div><div class="thint">[3]</div>
+      </div>
+    </div>
+    <div id="infopanel">
+      <div class="ipt">Field Info</div>
+      <div class="ipr">Grid <span id="igrid">38×38</span></div>
+      <div class="ipr">Max curve <span id="icurv">0.0</span></div>
+      <div class="ipr">Waves <span id="iwaves">0</span></div>
+      <div class="ipr">Particles <span id="iparts">0</span></div>
+    </div>
+    <div id="legend">
+      <div class="lgt">Curvature</div>
+      <div class="lgi"><div class="lgd" style="background:#0050ff"></div>Flat</div>
+      <div class="lgi"><div class="lgd" style="background:#8020ff"></div>Medium</div>
+      <div class="lgi"><div class="lgd" style="background:#ff1a8c"></div>Deep well</div>
+    </div>
+    <div id="ctxmenu"></div>
+    <div id="flash"></div>
+  </div>
+</div>
+
+<!-- ══ LEARN ══ -->
+<div id="plearn" class="panel">
+  <div class="lhero">
+    <h1>Space-Time <em>Physics</em></h1>
+    <p>Every equation, algorithm and design decision powering the gravity field engine — from Newton's law to gravitational wave propagation.</p>
+    <div class="ltags">
+      <span class="ltag">Newton's Gravity</span>
+      <span class="ltag">Gravitational Potential</span>
+      <span class="ltag">Plummer Softening</span>
+      <span class="ltag">Velocity Verlet</span>
+      <span class="ltag">Geodesics</span>
+      <span class="ltag">Gravitational Waves</span>
+      <span class="ltag">3D Projection</span>
     </div>
   </div>
+  <div class="lbody">
 
-  <div id="info">
-    <div class="info-title">Field Stats</div>
-    <div class="info-row">Grid resolution <span id="i-grid">38 × 38</span></div>
-    <div class="info-row">Max curvature <span id="i-curv">0.0</span></div>
-    <div class="info-row">Active waves <span id="i-waves">0</span></div>
-    <div class="info-row">Test particles <span id="i-parts">0</span></div>
+    <div class="card cc">
+      <div class="card-hd"><span class="cnum">§ 01</span><h2>Newton's Law of Gravity</h2><span class="badge bdc">Foundation</span></div>
+      <div class="card-bd">
+        <p>Every mass attracts every other mass. <strong>Newton's Law of Universal Gravitation</strong> gives the force as proportional to both masses and inversely proportional to the square of their separation.</p>
+        <div class="eq"><div class="eqlbl">Universal Gravitation</div>$$F = G\frac{m_1 m_2}{r^2}$$</div>
+        <div class="eq"><div class="eqlbl">Gravitational acceleration on body i from all others</div>$$\vec{a}_i = G\sum_{\substack{j=1\\j\neq i}}^{N}\frac{m_j(\vec{r}_j-\vec{r}_i)}{|\vec{r}_j-\vec{r}_i|^3}$$</div>
+        <p>This engine uses $G = 60{,}000$ simulation units. The inverse-square falloff creates the deep funnel shape you see in the curvature mesh — force drops rapidly with distance.</p>
+        <div class="note nc"><span class="nico">📐</span><p>Doubling the distance between two bodies reduces the gravitational force by <strong>four times</strong> — this is why orbits are stable. At just the right distance the centripetal acceleration exactly balances the gravitational pull.</p></div>
+      </div>
+    </div>
+
+    <div class="card cm">
+      <div class="card-hd"><span class="cnum">§ 02</span><h2>Space-Time Curvature Mesh</h2><span class="badge bdm">Einstein's Rubber Sheet</span></div>
+      <div class="card-bd">
+        <p>General Relativity tells us <strong>mass curves space-time</strong>. The rubber-sheet visualises this: each grid point's vertical displacement represents the depth of the gravitational potential well at that location.</p>
+        <div class="eq"><div class="eqlbl">Newtonian gravitational potential at position r</div>$$\Phi(\vec{r}) = -G\sum_{i=1}^{N}\frac{m_i}{|\vec{r}-\vec{r}_i|}$$</div>
+        <div class="eq"><div class="eqlbl">Visual mesh displacement at grid point (gx, gz)</div>$$\delta y(g_x,g_z) = -G_{vis}\sum_{i}\frac{m_i}{\sqrt{(g_x-x_i)^2+(g_z-z_i)^2+\varepsilon^2}^{\,2}+\delta}$$</div>
+        <div class="democanv">
+          <div class="demolbl">Live Curvature Demo — drag mass, adjust sliders <span class="democapt" id="demoinfo">mass = 10.0k</span></div>
+          <canvas id="democanvas" style="width:100%;height:200px;display:block;cursor:crosshair;background:#020408;"></canvas>
+          <div style="display:flex;gap:16px;padding:8px 14px;border-top:1px solid var(--bdr);background:rgba(0,0,0,0.3);align-items:center;">
+            <span style="font-family:var(--fm);font-size:9px;color:var(--dim);white-space:nowrap;">MASS</span>
+            <input type="range" id="mslider" min="1000" max="40000" value="10000" style="flex:1;accent-color:var(--cyan);">
+            <span style="font-family:var(--fm);font-size:9px;color:var(--dim);white-space:nowrap;">DEPTH</span>
+            <input type="range" id="dslider" min="0.3" max="2.5" step="0.1" value="1" style="flex:1;accent-color:var(--mag);">
+          </div>
+          <div class="democap">Drag the body on the canvas · adjust sliders to see how mass and depth scale affect the curvature well</div>
+        </div>
+        <p>The mesh is a <em>38×38 grid</em> recomputed every frame. Grid lines are depth-coloured: <em>blue = flat space</em>, <em>magenta = deep gravitational well</em>.</p>
+      </div>
+    </div>
+
+    <div class="card ca">
+      <div class="card-hd"><span class="cnum">§ 03</span><h2>Gravitational Softening</h2><span class="badge bda">Stability</span></div>
+      <div class="card-bd">
+        <p>At very close range, $r \to 0$ makes force blow up to infinity causing numerical explosions. A <strong>softening parameter ε</strong> (Plummer softening) prevents this.</p>
+        <div class="eq"><div class="eqlbl">Standard — singular at r = 0</div>$$F = \frac{Gm_1 m_2}{r^2}$$</div>
+        <div class="eq"><div class="eqlbl">Plummer softened — stable for all r</div>$$F = \frac{Gm_1 m_2}{r^2+\varepsilon^2}$$</div>
+        <div class="eq"><div class="eqlbl">Plummer potential</div>$$\Phi(r) = -\frac{Gm}{\sqrt{r^2+\varepsilon^2}}$$</div>
+        <div class="note na"><span class="nico">⚠</span><p>This engine uses two softening values: <code>ε = 18 px</code> for body physics and <code>ε = 30 px</code> for the visual mesh. The larger visual value keeps the well shape smooth. For $r \gg \varepsilon$ the force converges to exact Newtonian.</p></div>
+      </div>
+    </div>
+
+    <div class="card cc">
+      <div class="card-hd"><span class="cnum">§ 04</span><h2>Velocity Verlet Integration</h2><span class="badge bdc">2nd-Order Symplectic</span></div>
+      <div class="card-bd">
+        <p>To advance positions and velocities in time we use <strong>Velocity Verlet</strong> — a 2nd-order symplectic integrator. Unlike simple Euler, it averages old and new accelerations, making it energy-conserving and time-reversible.</p>
+        <div class="eq"><div class="eqlbl">Step 1 — position update</div>$$\vec{r}(t+h)=\vec{r}(t)+\vec{v}(t)\cdot h+\tfrac{1}{2}\vec{a}(t)\cdot h^2$$</div>
+        <div class="eq"><div class="eqlbl">Step 2 — recompute acceleration at new positions</div>$$\vec{a}(t+h)=\sum_j\text{GravForce}\bigl(\vec{r}(t+h)\bigr)$$</div>
+        <div class="eq"><div class="eqlbl">Step 3 — velocity correction using average acceleration</div>$$\vec{v}(t+h)=\vec{v}(t)+\tfrac{1}{2}\bigl[\vec{a}(t)+\vec{a}(t+h)\bigr]\cdot h$$</div>
+        <div class="note nc"><span class="nico">🔁</span><p>Physics runs in the <strong>XZ plane</strong> only. The Y axis is purely visual — the mesh deformation. Gravity never actually pulls bodies "down"; it acts horizontally, and the grid visualises the potential field separately.</p></div>
+      </div>
+    </div>
+
+    <div class="card cp">
+      <div class="card-hd"><span class="cnum">§ 05</span><h2>Geodesics & Test Particles</h2><span class="badge bdp">General Relativity</span></div>
+      <div class="card-bd">
+        <p>In GR, free-falling objects follow <strong>geodesics</strong> — straightest paths through curved space-time. Locally they feel no force; globally they curve around masses. Press <em>T</em> to shoot a massless test particle along a geodesic.</p>
+        <div class="eq"><div class="eqlbl">Geodesic equation (Newtonian approximation)</div>$$\frac{d^2\vec{r}}{dt^2}=-\nabla\Phi(\vec{r})=G\sum_i\frac{m_i(\vec{r}_i-\vec{r})}{|\vec{r}_i-\vec{r}|^3}$$</div>
+        <div class="eq"><div class="eqlbl">Light deflection — Schwarzschild metric (exact GR)</div>$$\delta\phi=\frac{4GM}{c^2 b}$$<div class="eqlbl" style="margin-top:6px">$b$ = impact parameter · first confirmed by Eddington (1919 solar eclipse)</div></div>
+        <div class="note np"><span class="nico">✦</span><p>Test particles here have <strong>zero mass</strong> — they don't affect the field. They integrate gravitational acceleration at <code>350 px/s</code> initial speed, tracing the curved paths that photons and small objects follow through the simulated space-time.</p></div>
+      </div>
+    </div>
+
+    <div class="card cg">
+      <div class="card-hd"><span class="cnum">§ 06</span><h2>Gravitational Waves</h2><span class="badge bdg">Radial Propagation</span></div>
+      <div class="card-bd">
+        <p>Body mergers emit <strong>gravitational waves</strong> — ripples in space-time propagating outward. This engine simulates them as expanding rings with oscillating mesh displacement and exponential amplitude falloff.</p>
+        <div class="eq"><div class="eqlbl">Wave front expansion</div>$$R(t)=R_0+v_{\text{wave}}\cdot t\qquad v_{\text{wave}}=260\text{ px/s}$$</div>
+        <div class="eq"><div class="eqlbl">Mesh displacement from wave at distance d</div>$$\delta y_w=A\cdot\cos\!\bigl(|d-R|\cdot k\bigr)\cdot e^{-|d-R|\cdot\gamma}\cdot\mathcal{L}(t)$$</div>
+        <div class="note nc"><span class="nico">🌊</span><p>LIGO detected the first gravitational wave in 2015 — from two merging black holes 1.3 billion light-years away. The strain was $h\approx10^{-21}$, smaller than 1/1000th the width of a proton. Real waves have "plus" and "cross" polarizations that stretch/compress space perpendicularly.</p></div>
+      </div>
+    </div>
+
+    <div class="card ca">
+      <div class="card-hd"><span class="cnum">§ 07</span><h2>3D Perspective Projection</h2><span class="badge bda">Rendering Math</span></div>
+      <div class="card-bd">
+        <p>The mesh lives in 3D world space (XYZ) but must render on a 2D canvas. We apply two rotation matrices then a perspective divide.</p>
+        <div class="eq"><div class="eqlbl">Rotate around Y axis (horizontal pan, θ_Y = 0.18 rad)</div>$$\begin{pmatrix}r_x\\r_{z_0}\end{pmatrix}=\begin{pmatrix}\cos\theta_Y&\sin\theta_Y\\-\sin\theta_Y&\cos\theta_Y\end{pmatrix}\begin{pmatrix}w_x\\w_z\end{pmatrix}$$</div>
+        <div class="eq"><div class="eqlbl">Rotate around X axis (tilt down, θ_X = 0.70 rad ≈ 40°)</div>$$r_y=w_y\cos\theta_X-r_{z_0}\sin\theta_X\qquad r_z=w_y\sin\theta_X+r_{z_0}\cos\theta_X$$</div>
+        <div class="eq"><div class="eqlbl">Perspective divide (focal f = 560, camera offset d₀ = 680)</div>$$s_x=c_x+\frac{r_x\cdot f}{r_z+d_0}\qquad s_y=c_y+\frac{r_y\cdot f}{r_z+d_0}$$</div>
+        <div class="div"></div>
+        <div style="font-family:var(--ff);font-size:13px;letter-spacing:2px;color:var(--text);text-transform:uppercase;margin-bottom:9px;">All Controls</div>
+        <table class="ctrltbl">
+          <tr><th>Input</th><th>Action</th></tr>
+          <tr><td>LMB drag (canvas)</td><td>Spawn body — drag direction + length = velocity</td></tr>
+          <tr><td>LMB click body</td><td>Select / highlight that body</td></tr>
+          <tr><td>RMB drag</td><td>Pan the camera</td></tr>
+          <tr><td>RMB click (empty)</td><td>Open spawn context menu at that world position</td></tr>
+          <tr><td>Scroll wheel</td><td>Zoom toward cursor</td></tr>
+          <tr><td>Toolbar buttons</td><td>Switch spawn type (Planet / Star / Singularity)</td></tr>
+          <tr><td>Space</td><td>Pause / unpause simulation</td></tr>
+          <tr><td>T</td><td>Shoot test particle from cursor</td></tr>
+          <tr><td>W</td><td>Toggle gravitational wave ripples</td></tr>
+          <tr><td>G</td><td>Cycle grid resolution (full / half / quarter)</td></tr>
+          <tr><td>1 / 2 / 3</td><td>Switch spawn type by keyboard</td></tr>
+          <tr><td>C</td><td>Clear all bodies and particles</td></tr>
+          <tr><td>R</td><td>Reset demo configuration</td></tr>
+        </table>
+      </div>
+    </div>
+
   </div>
+</div>
 
-  <div id="legend">
-    <div class="leg-title">Curvature</div>
-    <div class="leg-item"><div class="leg-dot" style="background:#0050ff"></div>Flat space</div>
-    <div class="leg-item"><div class="leg-dot" style="background:#8020ff"></div>Low curvature</div>
-    <div class="leg-item"><div class="leg-dot" style="background:#ff1a8c"></div>Deep well</div>
+<!-- ══ CODE ══ -->
+<div id="pcode" class="panel">
+  <div class="chero"><h1>Algorithm <em>Source</em></h1><p>Pseudocode and complexity analysis for every system in the Gravity Field Simulator.</p></div>
+  <div class="csect">
+
+    <div class="ablk">
+      <div class="atitle">Grid Deformation <span class="albl">O(N·G²) per frame</span></div>
+<pre><span class="cm">// 38×38 = 1444 grid points, recomputed every frame</span>
+<span class="kw">function</span> <span class="fn">updateGrid</span>(bodies, gridPoints):
+  <span class="kw">for each</span> point g:
+    dy = <span class="num">0</span>
+    <span class="kw">for each</span> body b:
+      dist = sqrt((g.wx-b.wx)² + (g.wz-b.wz)² + ε_vis²)
+      dy  -= G_vis * b.mass / (dist² + δ)
+    <span class="kw">if</span> showWaves:
+      <span class="kw">for each</span> wave w:
+        d_to_front = |distance(g, w.origin) - w.radius|
+        <span class="kw">if</span> d_to_front < <span class="num">30</span>:
+          dy += cos(d*k) * exp(-d*γ) * w.life * w.strength * <span class="num">8</span>
+    g.wy = clamp(dy, -MAX_DEPTH, <span class="num">20</span>)</pre>
+    </div>
+
+    <div class="div"></div>
+    <div class="ablk">
+      <div class="atitle">Velocity Verlet N-body <span class="albl">O(N²) per step</span></div>
+<pre><span class="kw">function</span> <span class="fn">verletStep</span>(dt):
+  <span class="cm">// Step 1 — advance positions</span>
+  <span class="kw">for</span> i: pos[i] += vel[i]*dt + <span class="num">0.5</span>*acc[i]*dt²
+
+  <span class="cm">// Step 2 — new accelerations at updated positions</span>
+  <span class="kw">for</span> i:
+    newAcc[i] = <span class="num">0</span>
+    <span class="kw">for</span> j≠i:
+      d² = (pos[j]-pos[i])² + ε²
+      newAcc[i] += G * mass[j] / d² * direction(i→j)
+
+  <span class="cm">// Step 3 — average acceleration velocity correction</span>
+  <span class="kw">for</span> i:
+    vel[i] += <span class="num">0.5</span> * (acc[i] + newAcc[i]) * dt
+    acc[i]  = newAcc[i]</pre>
+    </div>
+
+    <div class="div"></div>
+    <div class="ablk">
+      <div class="atitle">Exact Screen→World Inverse <span class="albl">Analytical</span></div>
+<pre><span class="cm">// Exact inverse of the 3D projection for y=0 (grid plane)
+// Used for spawn placement and pan</span>
+<span class="kw">function</span> <span class="fn">screenToWorldFlat</span>(sx, sy):
+  dsy  = sy - screenCentreY
+  <span class="cm">// Solve for rz0 analytically (from y=0 constraint)</span>
+  denom = dsy * cos(θX) / FOCAL + sin(θX)
+  rz0   = -(dsy * CAM_OFFSET / FOCAL) / denom
+  depth = rz0 * cos(θX) + CAM_OFFSET
+  rx    = (sx - screenCentreX) * depth / FOCAL
+  <span class="cm">// Inverse Y rotation</span>
+  tx = rx * cos(θY) - rz0 * sin(θY)
+  tz = rx * sin(θY) + rz0 * cos(θY)
+  <span class="kw">return</span> { wx: tx/zoom + offX, wz: tz/zoom + offY }</pre>
+    </div>
+
+    <div class="div"></div>
+    <div class="ablk">
+      <div class="atitle">Complexity Summary</div>
+      <table class="ctab">
+        <tr><th>System</th><th>Complexity</th><th>Notes</th></tr>
+        <tr><td>Grid deformation</td><td class="to">O(N·G²)</td><td>N=12 bodies, G=38 → ~17k ops/frame</td></tr>
+        <tr><td>Grid projection</td><td class="tg">O(G²)</td><td>~1.4k perspective divides</td></tr>
+        <tr><td>Grid rendering</td><td class="tg">O(G²)</td><td>~2.8k canvas stroke calls</td></tr>
+        <tr><td>N-body Verlet</td><td class="to">O(N²)</td><td>~144 force pairs at N=12</td></tr>
+        <tr><td>Wave propagation</td><td class="tg">O(W·G²)</td><td>W≤20 waves · ~28k checks max</td></tr>
+        <tr><td>Test particles</td><td class="tg">O(P·N)</td><td>P≤80 particles · ~960 ops max</td></tr>
+        <tr><td>Collision detection</td><td class="to">O(N²)</td><td>Pairwise overlap, ~66 checks</td></tr>
+      </table>
+    </div>
+
   </div>
 </div>
 
 <script>
 'use strict';
 
-// ═══════════════ SETUP ═══════════════
-const canvas = document.getElementById('c');
-const ctx    = canvas.getContext('2d');
-let W = window.innerWidth, H = window.innerHeight;
-canvas.width=W; canvas.height=H;
-
-window.addEventListener('resize', ()=>{
-  W=window.innerWidth; H=window.innerHeight;
-  canvas.width=W; canvas.height=H;
-});
-
-// ═══════════════ CONSTANTS ═══════════════
-const GRID_N    = 38;
-const GRID_HALF = 310;
-const G_PHYS    = 60000;
-const G_VIS     = 1800;      // visual deformation scale
-const SOFT_PHYS = 18;
-const SOFT_VIS  = 30;
-const MAX_DEPTH = 180;
-const FOCAL     = 560;
-const CAM_RX    = 0.70;      // camera tilt (radians) — looking down
-const CAM_RY    = 0.18;      // slight horizontal rotation
-const MAX_BODIES = 12;
-const MAX_WAVES  = 20;
-const MAX_PARTS  = 80;
-const WAVE_SPEED = 260;
-
-// Grid precomputed world X/Z
-const GWX = new Float32Array(GRID_N * GRID_N);
-const GWZ = new Float32Array(GRID_N * GRID_N);
-const GWY = new Float32Array(GRID_N * GRID_N); // deformation (y = down in world)
-
-for(let i=0;i<GRID_N;i++) for(let j=0;j<GRID_N;j++){
-  const idx=i*GRID_N+j;
-  GWX[idx]=-GRID_HALF + j*(GRID_HALF*2/(GRID_N-1));
-  GWZ[idx]=-GRID_HALF + i*(GRID_HALF*2/(GRID_N-1));
+// ══════════════════════════════════════════════
+//  TAB SYSTEM
+// ══════════════════════════════════════════════
+let katexReady=false, mathDone=false, learnSeen=false;
+function tryRenderMath(){
+  if(katexReady&&learnSeen&&!mathDone){
+    renderMathInElement(document.getElementById('plearn'),{
+      delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],
+      throwOnError:false
+    });
+    mathDone=true;
+    startLearnDemo();
+  }
+}
+function switchTab(t){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('on'));
+  document.getElementById('p'+t).classList.add('on');
+  document.querySelectorAll('.tab').forEach(b=>{
+    if(b.textContent.toLowerCase().includes(t.slice(0,3)))b.classList.add('on');
+  });
+  if(t==='learn'){learnSeen=true;tryRenderMath();}
+  if(t==='sim') simRunning=true;
 }
 
-// Screen projection cache
-const GSX = new Float32Array(GRID_N * GRID_N);
-const GSY = new Float32Array(GRID_N * GRID_N);
-const GSD = new Float32Array(GRID_N * GRID_N); // depth
+// ══════════════════════════════════════════════
+//  LEARN DEMO — curvature visualizer
+// ══════════════════════════════════════════════
+function startLearnDemo(){
+  const dc=document.getElementById('democanvas');
+  if(!dc)return;
+  const dctx=dc.getContext('2d');
+  const GN=26,FOCAL_D=360;
+  const CRXd=Math.cos(0.62),SRXd=Math.sin(0.62),CRYd=Math.cos(0.15),SRYd=Math.sin(0.15);
+  const gwx2=new Float32Array(GN*GN),gwz2=new Float32Array(GN*GN);
+  const GH2=240;
+  for(let i=0;i<GN;i++)for(let j=0;j<GN;j++){
+    gwx2[i*GN+j]=-GH2+j*(GH2*2/(GN-1));
+    gwz2[i*GN+j]=-GH2+i*(GH2*2/(GN-1));
+  }
+  let dbx=0,dbz=0;
+  function dp(wx,wy,wz,W,H){
+    const rx=wx*CRYd+wz*SRYd,rz0=-wx*SRYd+wz*CRYd;
+    const ry=wy*CRXd-rz0*SRXd,rz=wy*SRXd+rz0*CRXd;
+    const d=rz+460;if(d<5)return null;
+    const s=FOCAL_D/d;return{sx:W/2+rx*s,sy:H*0.38+ry*s};
+  }
+  function dCol(wy){
+    const t=Math.min(1,Math.abs(wy)/130);
+    if(t<0.5){const s=t*2;return`rgb(${s*100|0},${(80-80*s)|0},255)`;}
+    const s=(t-0.5)*2;return`rgb(${(100+155*s)|0},0,${(255-165*s)|0})`;
+  }
+  function drawDemo(){
+    const W=dc.offsetWidth||840,H=dc.offsetHeight||200;
+    if(dc.width!==W||dc.height!==H){dc.width=W;dc.height=H;}
+    const mass=+document.getElementById('mslider').value;
+    const ds=+document.getElementById('dslider').value;
+    dctx.fillStyle='#020408';dctx.fillRect(0,0,W,H);
+    const gwy2=new Float32Array(GN*GN);
+    for(let k=0;k<GN*GN;k++){
+      const dx=gwx2[k]-dbx,dz=gwz2[k]-dbz;
+      const d=Math.sqrt(dx*dx+dz*dz+700);
+      gwy2[k]=Math.max(-160,-(ds*1400*mass)/(d*d+180));
+    }
+    const gsx=new Float32Array(GN*GN),gsy=new Float32Array(GN*GN),gok=new Uint8Array(GN*GN);
+    for(let k=0;k<GN*GN;k++){
+      const p=dp(gwx2[k],-gwy2[k]*0.42,gwz2[k],W,H);
+      if(p){gsx[k]=p.sx;gsy[k]=p.sy;gok[k]=1;}
+    }
+    for(let i=0;i<GN-1;i++)for(let j=0;j<GN-1;j++){
+      const k=i*GN+j,kr=i*GN+j+1,kd=(i+1)*GN+j;
+      if(!gok[k]||!gok[kr]||!gok[kd])continue;
+      const av=(gwy2[k]+gwy2[kr])/2,av2=(gwy2[k]+gwy2[kd])/2;
+      dctx.globalAlpha=0.38+0.42*Math.min(1,Math.abs(av)/120);
+      dctx.strokeStyle=dCol(av);dctx.lineWidth=0.9;
+      dctx.beginPath();dctx.moveTo(gsx[k],gsy[k]);dctx.lineTo(gsx[kr],gsy[kr]);dctx.stroke();
+      dctx.globalAlpha=0.38+0.42*Math.min(1,Math.abs(av2)/120);
+      dctx.strokeStyle=dCol(av2);
+      dctx.beginPath();dctx.moveTo(gsx[k],gsy[k]);dctx.lineTo(gsx[kd],gsy[kd]);dctx.stroke();
+    }
+    dctx.globalAlpha=1;
+    const pb=dp(dbx,0,dbz,W,H);
+    if(pb){
+      dctx.globalAlpha=0.18;dctx.fillStyle='#ffdc50';
+      dctx.beginPath();dctx.arc(pb.sx,pb.sy,22,0,Math.PI*2);dctx.fill();
+      dctx.globalAlpha=1;dctx.fillStyle='#ffdc50';
+      dctx.beginPath();dctx.arc(pb.sx,pb.sy,8,0,Math.PI*2);dctx.fill();
+    }
+    document.getElementById('demoinfo').textContent=`mass=${(mass/1000).toFixed(1)}k · depth=${ds.toFixed(1)}×`;
+    requestAnimationFrame(drawDemo);
+  }
+  dc.addEventListener('mousemove',e=>{
+    if(e.buttons!==1)return;
+    const r=dc.getBoundingClientRect();
+    dbx=(e.clientX-r.left-dc.width/2)*1.1;
+    dbz=(e.clientY-r.top-dc.height*0.38)*2.5;
+  });
+  drawDemo();
+}
 
-// ═══════════════ STATE ═══════════════
-let bodies = [];   // { wx,wz, vx,vz, ax,az, mass, radius, type, colR,colG,colB }
-let waves  = [];   // { wx,wz, r, life, maxLife, speed, strength }
-let parts  = [];   // test particles { wx,wz, vx,vz, trail[], life }
+// ══════════════════════════════════════════════
+//  SIMULATION ENGINE
+// ══════════════════════════════════════════════
+const simcanvas=document.getElementById('simcanvas');
+const ctx=simcanvas.getContext('2d');
+const NAV=52;
+let SW,SH; // sim canvas width/height
 
-let paused   = false;
-let showWaves= true;
-let gridDetail=1; // 1=full, 2=half, 3=quarter
-let spawnMode= 0;
+function resizeSim(){
+  SW=window.innerWidth; SH=window.innerHeight-NAV;
+  simcanvas.width=SW; simcanvas.height=SH;
+  simcanvas.style.width=SW+'px'; simcanvas.style.height=SH+'px';
+}
+resizeSim();
+window.addEventListener('resize',resizeSim);
 
-let camOffX=0, camOffY=0; // pan offset (world units)
-let camZoom =1.0;
+// ── constants ──
+const GN=38, GH=310, G_PHYS=60000, G_VIS=1800;
+const SP=18, SV=30; // softening physics / visual
+const MAX_D=180, FOC=560, CRX=0.70, CRY=0.18;
+const TBW=130, MAX_B=12, MAX_W=20, MAX_P=80;
+const CRXC=Math.cos(CRX),CRXS=Math.sin(CRX);
+const CRYC=Math.cos(CRY),CRYS=Math.sin(CRY);
+const CAM_OFF=680;
 
-let rmbDown=false, rmbLast={x:0,y:0};
-let lmbDown=false, lmbPress={x:0,y:0}, lmbDist=0;
-let lastMX=0, lastMY=0;
-let selectedBody=-1;
+// Grid arrays
+const GWX=new Float32Array(GN*GN),GWZ=new Float32Array(GN*GN);
+const GWY=new Float32Array(GN*GN);
+const GSX=new Float32Array(GN*GN),GSY=new Float32Array(GN*GN);
+const GSD=new Float32Array(GN*GN);
+for(let i=0;i<GN;i++)for(let j=0;j<GN;j++){
+  GWX[i*GN+j]=-GH+j*(GH*2/(GN-1));
+  GWZ[i*GN+j]=-GH+i*(GH*2/(GN-1));
+}
 
-let flashAmt=0;
-let fpsSmooth=60, lastT=performance.now();
+// State
+let bodies=[],waves=[],parts=[];
+let paused=false,showW=true,gdetail=1,spawnMode=0;
+let camX=0,camY=0,camZ=1.0; // pan offsets (world) + zoom
+let flashAmt=0,fpsSmooth=60,lastT=performance.now();
+let selBody=-1,simRunning=true;
 
-// Spawn drag
-let spawning=false, spawnStart={x:0,y:0}, spawnNow={x:0,y:0};
-const CLICK_THRESH=8;
+// Mouse state — all in CANVAS-LOCAL coords (0,0 = top-left of canvas)
+let mx=0,my=0; // current mouse pos on canvas
+let lmbDown=false,lmbPressX=0,lmbPressY=0,lmbDist=0;
+let rmbDown=false,rmbPressX=0,rmbPressY=0,rmbDragDist=0;
+let spawning=false;
+let spawnWX=0,spawnWZ=0; // world spawn origin
+let spawnNWX=0,spawnNWZ=0; // world spawn current
+let ctxOpen=false,ctxScreenX=0,ctxScreenY=0,ctxWX=0,ctxWZ=0;
 
-// ═══════════════ SPAWN CONFIG ═══════════════
 const SPAWN_CFG=[
-  {mass:1200, radius:10, cr:100,cg:160,cb:255, name:'Planet'},
-  {mass:8000, radius:16, cr:255,cg:200,cb:60,  name:'Star'},
-  {mass:50000,radius:8,  cr:255,cg:26, cb:140, name:'Singularity'},
+  {mass:1200,r:10,cr:100,cg:160,cb:255,name:'Planet'},
+  {mass:8000,r:16,cr:255,cg:200,cb:60,name:'Star'},
+  {mass:50000,r:8,cr:255,cg:26,cb:140,name:'Singularity'},
 ];
 
-// ═══════════════ CAMERA MATH ═══════════════
-// Fixed camera angles, variable pan+zoom
-// World: X=right, Y=up (deformation), Z=forward
-// The grid is in XZ plane; masses push it downward (-Y)
-// Camera tilted to look at the grid from above-front
-
-const CRX_COS=Math.cos(CAM_RX), CRX_SIN=Math.sin(CAM_RX);
-const CRY_COS=Math.cos(CAM_RY), CRY_SIN=Math.sin(CAM_RY);
-
-function worldToScreen(wx, wy, wz){
-  // Apply pan and zoom
-  const tx=(wx-camOffX)*camZoom;
-  const tz=(wz-camOffY)*camZoom;
-  const ty=wy*camZoom;
-
-  // Rotate Y
-  const rx = tx*CRY_COS + tz*CRY_SIN;
-  const rz0=-tx*CRY_SIN + tz*CRY_COS;
-  // Rotate X
-  const ry = ty*CRX_COS - rz0*CRX_SIN;
-  const rz = ty*CRX_SIN + rz0*CRX_COS;
-
-  // Perspective
-  const depth=rz+680;
-  if(depth<10) return null;
-  const s=FOCAL/depth;
-  return{
-    sx:W/2+rx*s, sy:H*0.42+ry*s,
-    depth:rz, s, ry
-  };
+// ── world ↔ screen ──
+function w2s(wx,wy,wz){
+  const tx=(wx-camX)*camZ, tz=(wz-camY)*camZ, ty=wy*camZ;
+  const rx=tx*CRYC+tz*CRYS, rz0=-tx*CRYS+tz*CRYC;
+  const ry=ty*CRXC-rz0*CRXS, rz=ty*CRXS+rz0*CRXC;
+  const depth=rz+CAM_OFF; if(depth<10)return null;
+  const s=FOC/depth;
+  return{sx:SW/2+rx*s, sy:SH*0.42+ry*s, depth:rz, s};
 }
 
-// Screen → world flat (y=0): for body placement
-function screenToWorldFlat(sx, sy){
-  // Inverse perspective + inverse rotation for y=0
-  // Approximate: use the flat grid plane
-  // We iterate to find wx,wz such that worldToScreen(wx,0,wz)={sx,sy}
-  // Simple approach: invert the linear part at y=0
-  const depth=680;
-  const s=FOCAL/depth;
-  const rx=(sx-W/2)/s;
-  const ry_screen=(sy-H*0.42)/s;
-  // From ry = ry_screen and y=0: rz0 = -ry_screen / sin(CAM_RX)... 
-  // Simplified inverse (approximate):
-  const rz0=-ry_screen/CRX_SIN;
-  const tx_approx=(rx*CRY_COS - rz0*CRY_SIN);
-  const tz_approx=(rx*CRY_SIN + rz0*CRY_COS);
-  return{wx:tx_approx/camZoom+camOffX, wz:tz_approx/camZoom+camOffY};
+// Exact analytical inverse for y=0 plane
+function s2w(sx,sy){
+  const dsy=sy-SH*0.42;
+  const denom=dsy*CRXC/FOC+CRXS;
+  if(Math.abs(denom)<0.0001)return{wx:0,wz:0};
+  const rz0=-(dsy*CAM_OFF/FOC)/denom;
+  const depth=rz0*CRXC+CAM_OFF;
+  if(depth<10)return{wx:0,wz:0};
+  const rx=(sx-SW/2)*depth/FOC;
+  const tx=rx*CRYC-rz0*CRYS;
+  const tz=rx*CRYS+rz0*CRYC;
+  return{wx:tx/camZ+camX, wz:tz/camZ+camY};
 }
 
-// ═══════════════ GRID DEFORMATION ═══════════════
+// ── grid update ──
 function updateGrid(){
   let maxC=0;
-  for(let k=0;k<GRID_N*GRID_N;k++){
-    const gx=GWX[k], gz=GWZ[k];
+  for(let k=0;k<GN*GN;k++){
+    const gx=GWX[k],gz=GWZ[k];
     let dy=0;
     for(let b=0;b<bodies.length;b++){
-      const dx=gx-bodies[b].wx, dz=gz-bodies[b].wz;
-      const d=Math.sqrt(dx*dx+dz*dz+SOFT_VIS*SOFT_VIS);
-      dy -= G_VIS*bodies[b].mass/(d*d+800);
+      const dx=gx-bodies[b].wx,dz=gz-bodies[b].wz;
+      const d=Math.sqrt(dx*dx+dz*dz+SV*SV);
+      dy-=G_VIS*bodies[b].mass/(d*d+800);
     }
-    // Add wave deformation
-    if(showWaves){
+    if(showW){
       for(let w=0;w<waves.length;w++){
-        const dx=gx-waves[w].wx, dz=gz-waves[w].wz;
-        const d=Math.sqrt(dx*dx+dz*dz);
-        const dist=Math.abs(d-waves[w].r);
-        if(dist<30){
-          const wf=Math.cos(dist*0.2)*Math.exp(-dist*0.07)*waves[w].life*waves[w].strength;
-          dy+=wf*8;
-        }
+        const wv=waves[w];
+        const dx=gx-wv.wx,dz=gz-wv.wz;
+        const dist=Math.abs(Math.sqrt(dx*dx+dz*dz)-wv.r);
+        if(dist<30){dy+=(Math.cos(dist*0.2)*Math.exp(-dist*0.07)*wv.life*wv.str)*8;}
       }
     }
-    GWY[k]=Math.max(-MAX_DEPTH, Math.min(20, dy));
-    if(Math.abs(GWY[k])>maxC) maxC=Math.abs(GWY[k]);
+    GWY[k]=Math.max(-MAX_D,Math.min(20,dy));
+    if(Math.abs(GWY[k])>maxC)maxC=Math.abs(GWY[k]);
   }
-  document.getElementById('i-curv').textContent=maxC.toFixed(1);
+  document.getElementById('icurv').textContent=maxC.toFixed(1);
 }
 
-// Project all grid points
 function projectGrid(){
-  for(let k=0;k<GRID_N*GRID_N;k++){
-    const p=worldToScreen(GWX[k],-GWY[k]*0.5,GWZ[k]);
+  for(let k=0;k<GN*GN;k++){
+    const p=w2s(GWX[k],-GWY[k]*0.5,GWZ[k]);
     if(p){GSX[k]=p.sx;GSY[k]=p.sy;GSD[k]=p.depth;}
-    else{GSX[k]=-9999;GSY[k]=-9999;GSD[k]=9999;}
+    else{GSX[k]=-9999;}
   }
 }
 
-// ═══════════════ DEPTH COLOR ═══════════════
-function depthColor(wy){
-  // wy is deformation (negative = deeper)
-  const t=Math.min(1,Math.abs(wy)/MAX_DEPTH);
-  // Blue → Purple → Magenta
-  let r,g,b;
-  if(t<0.5){
-    const s=t*2;
-    r=(0+128*s)|0; g=(80-80*s)|0; b=(255)|0;
-  }else{
-    const s=(t-0.5)*2;
-    r=(128+127*s)|0; g=(0)|0; b=(255-165*s)|0;
-  }
-  return`rgb(${r},${g},${b})`;
+function depthCol(wy){
+  const t=Math.min(1,Math.abs(wy)/MAX_D);
+  if(t<0.5){const s=t*2;return`rgb(${s*100|0},${(80-80*s)|0},255)`;}
+  const s=(t-0.5)*2;return`rgb(${(100+155*s)|0},0,${(255-165*s)|0})`;
 }
 
-function depthAlpha(wy){
-  return 0.25+0.55*Math.min(1,Math.abs(wy)/MAX_DEPTH);
-}
-
-// ═══════════════ DRAW GRID ═══════════════
 function drawGrid(){
-  const step=gridDetail;
-  for(let i=0;i<GRID_N-step;i+=step){
-    for(let j=0;j<GRID_N-step;j+=step){
-      const k =i*GRID_N+j;
-      const kr=i*GRID_N+(j+step);
-      const kd=(i+step)*GRID_N+j;
-      if(GSX[k]<-9000||GSX[kr]<-9000||GSX[kd]<-9000) continue;
-
-      const avgY=(GWY[k]+GWY[kr])*0.5;
-      const avgYv=(GWY[k]+GWY[kd])*0.5;
-      const col=depthColor(avgY), colv=depthColor(avgYv);
-      const alp=depthAlpha(avgY), alpv=depthAlpha(avgYv);
-
-      // Horizontal line
-      ctx.strokeStyle=col; ctx.globalAlpha=alp;
-      ctx.lineWidth=Math.max(0.4,1-GSD[k]/1200);
+  const step=gdetail;
+  for(let i=0;i<GN-step;i+=step){
+    for(let j=0;j<GN-step;j+=step){
+      const k=i*GN+j,kr=i*GN+(j+step),kd=(i+step)*GN+j;
+      if(GSX[k]<-9000||GSX[kr]<-9000||GSX[kd]<-9000)continue;
+      const a1=(GWY[k]+GWY[kr])/2,a2=(GWY[k]+GWY[kd])/2;
+      const lw=Math.max(0.4,1-GSD[k]/1400);
+      ctx.strokeStyle=depthCol(a1);
+      ctx.globalAlpha=0.22+0.55*Math.min(1,Math.abs(a1)/MAX_D);
+      ctx.lineWidth=lw;
       ctx.beginPath();ctx.moveTo(GSX[k],GSY[k]);ctx.lineTo(GSX[kr],GSY[kr]);ctx.stroke();
-
-      // Vertical line
-      ctx.strokeStyle=colv; ctx.globalAlpha=alpv;
-      ctx.lineWidth=Math.max(0.4,1-GSD[k]/1200);
+      ctx.strokeStyle=depthCol(a2);
+      ctx.globalAlpha=0.22+0.55*Math.min(1,Math.abs(a2)/MAX_D);
       ctx.beginPath();ctx.moveTo(GSX[k],GSY[k]);ctx.lineTo(GSX[kd],GSY[kd]);ctx.stroke();
     }
   }
   ctx.globalAlpha=1;
 }
 
-// ═══════════════ PHYSICS ═══════════════
-const naX=[], naZ=[];
-
-function physicsStep(dt){
-  // Verlet step for bodies
+// ── physics ──
+const naX=[],naZ=[];
+function physStep(dt){
   const hh=0.5*dt*dt;
+  // Position update
   for(let i=0;i<bodies.length;i++){
-    bodies[i].wx+=bodies[i].vx*dt+bodies[i].ax*hh;
-    bodies[i].wz+=bodies[i].vz*dt+bodies[i].az*hh;
+    const b=bodies[i];
+    b.wx+=b.vx*dt+b.ax*hh;
+    b.wz+=b.vz*dt+b.az*hh;
   }
   // New accelerations
   for(let i=0;i<bodies.length;i++){
     let ax=0,az=0;
     for(let j=0;j<bodies.length;j++){
       if(i===j)continue;
-      const dx=bodies[j].wx-bodies[i].wx;
-      const dz=bodies[j].wz-bodies[i].wz;
-      const d2=dx*dx+dz*dz+SOFT_PHYS*SOFT_PHYS;
-      const d=Math.sqrt(d2);
+      const dx=bodies[j].wx-bodies[i].wx,dz=bodies[j].wz-bodies[i].wz;
+      const d2=dx*dx+dz*dz+SP*SP,d=Math.sqrt(d2);
       const am=G_PHYS*bodies[j].mass/d2;
-      ax+=dx/d*am; az+=dz/d*am;
+      ax+=dx/d*am;az+=dz/d*am;
     }
-    naX[i]=ax; naZ[i]=az;
+    naX[i]=ax;naZ[i]=az;
   }
+  // Velocity update
   for(let i=0;i<bodies.length;i++){
     bodies[i].vx+=0.5*(bodies[i].ax+naX[i])*dt;
     bodies[i].vz+=0.5*(bodies[i].az+naZ[i])*dt;
-    bodies[i].ax=naX[i]; bodies[i].az=naZ[i];
+    bodies[i].ax=naX[i];bodies[i].az=naZ[i];
   }
-
-  // Collisions (simple merge)
+  // Collisions
   for(let i=0;i<bodies.length;i++){
     for(let j=i+1;j<bodies.length;j++){
-      const dx=bodies[j].wx-bodies[i].wx;
-      const dz=bodies[j].wz-bodies[i].wz;
-      const r=bodies[i].radius+bodies[j].radius;
+      const dx=bodies[j].wx-bodies[i].wx,dz=bodies[j].wz-bodies[i].wz;
+      const r=bodies[i].r+bodies[j].r;
       if(dx*dx+dz*dz<r*r){
         const m=bodies[i].mass+bodies[j].mass;
         const cvx=(bodies[i].vx*bodies[i].mass+bodies[j].vx*bodies[j].mass)/m;
         const cvz=(bodies[i].vz*bodies[i].mass+bodies[j].vz*bodies[j].mass)/m;
         const cpx=(bodies[i].wx*bodies[i].mass+bodies[j].wx*bodies[j].mass)/m;
         const cpz=(bodies[i].wz*bodies[i].mass+bodies[j].wz*bodies[j].mass)/m;
-        // Shockwave
-        addWave(cpx,cpz,Math.sqrt((bodies[i].vx-bodies[j].vx)**2+(bodies[i].vz-bodies[j].vz)**2)*0.3+0.5);
-        flashAmt=0.6;
-        bodies[i]={...bodies[i],wx:cpx,wz:cpz,vx:cvx,vz:cvz,mass:m,
-          radius:Math.min(30,bodies[i].radius*1.2),
-          type:m>20000?2:m>8000?1:0,
+        addWave(cpx,cpz,0.9);flashAmt=0.6;
+        bodies[i]={wx:cpx,wz:cpz,vx:cvx,vz:cvz,ax:0,az:0,
+          mass:m,r:Math.min(28,bodies[i].r*1.18),
           cr:(bodies[i].cr+bodies[j].cr)/2|0,
           cg:(bodies[i].cg+bodies[j].cg)/2|0,
-          cb:(bodies[i].cb+bodies[j].cb)/2|0,
-          ax:0,az:0};
+          cb:(bodies[i].cb+bodies[j].cb)/2|0};
         bodies.splice(j,1);j--;
+        if(selBody===j)selBody=-1;
+        if(selBody>j)selBody--;
       }
     }
   }
-
   // Test particles
   for(let p=0;p<parts.length;p++){
     const pt=parts[p];
-    // Force from bodies
     let ax=0,az=0;
     for(let b=0;b<bodies.length;b++){
-      const dx=bodies[b].wx-pt.wx;
-      const dz=bodies[b].wz-pt.wz;
-      const d2=dx*dx+dz*dz+SOFT_PHYS*SOFT_PHYS;
-      const d=Math.sqrt(d2);
+      const dx=bodies[b].wx-pt.wx,dz=bodies[b].wz-pt.wz;
+      const d2=dx*dx+dz*dz+SP*SP,d=Math.sqrt(d2);
       const am=G_PHYS*bodies[b].mass/d2;
-      ax+=dx/d*am; az+=dz/d*am;
+      ax+=dx/d*am;az+=dz/d*am;
     }
-    pt.vx+=ax*dt; pt.vz+=az*dt;
-    pt.wx+=pt.vx*dt; pt.wz+=pt.vz*dt;
+    pt.vx+=ax*dt;pt.vz+=az*dt;
+    pt.wx+=pt.vx*dt;pt.wz+=pt.vz*dt;
     pt.trail.push({wx:pt.wx,wz:pt.wz});
-    if(pt.trail.length>60) pt.trail.shift();
-    pt.life-=dt*0.25;
-    // Check absorbed by body
+    if(pt.trail.length>70)pt.trail.shift();
+    pt.life-=dt*0.22;
     for(let b=0;b<bodies.length;b++){
-      const dx=pt.wx-bodies[b].wx, dz=pt.wz-bodies[b].wz;
-      if(dx*dx+dz*dz<(bodies[b].radius+4)**2){pt.life=0;break;}
+      const dx=pt.wx-bodies[b].wx,dz=pt.wz-bodies[b].wz;
+      if(dx*dx+dz*dz<(bodies[b].r+5)**2){pt.life=0;break;}
     }
   }
-  parts=parts.filter(p=>p.life>0&&Math.abs(p.wx)<1200&&Math.abs(p.wz)<1200);
-
+  parts=parts.filter(p=>p.life>0&&Math.abs(p.wx)<1400&&Math.abs(p.wz)<1400);
   // Waves
-  for(let w=0;w<waves.length;w++){
-    waves[w].r+=waves[w].speed*dt;
-    waves[w].life-=dt*0.35;
-  }
-  waves=waves.filter(w=>w.life>0&&w.r<800);
+  for(let w=0;w<waves.length;w++){waves[w].r+=260*dt;waves[w].life-=dt*0.35;}
+  waves=waves.filter(w=>w.life>0&&w.r<900);
 }
 
-function addWave(wx,wz,strength){
-  if(waves.length<MAX_WAVES) waves.push({wx,wz,r:0,life:1,maxLife:1,speed:WAVE_SPEED,strength:Math.min(2,strength)});
+function addWave(wx,wz,str){
+  if(waves.length<MAX_W)waves.push({wx,wz,r:0,life:1,str:Math.min(2,str)});
+}
+function addPart(wx,wz,vx,vz){
+  if(parts.length<MAX_P)parts.push({wx,wz,vx,vz,trail:[],life:1});
 }
 
-// ═══════════════ DRAW BODIES ═══════════════
+// ── draw bodies ──
 function drawBodies(){
-  // Sort by depth
-  const sorted=[...bodies].map((b,i)=>{
-    const p=worldToScreen(b.wx,0,b.wz);
-    return{b,p,i};
-  }).filter(x=>x.p).sort((a,z)=>z.p.depth-a.p.depth);
-
-  for(const {b,p,i: idx} of sorted){
-    const {sx,sy,s}=p;
-    const sr=b.radius*s*2.5;
-
-    if(b.type===2){
-      // Singularity: deep magenta ring + black core
-      for(let g=5;g>=1;g--){
-        ctx.globalAlpha=0.06*g;
-        ctx.fillStyle=`rgba(255,26,140,1)`;
-        ctx.beginPath();ctx.arc(sx,sy,sr+g*12,0,Math.PI*2);ctx.fill();
-      }
-      ctx.globalAlpha=1;
-      ctx.fillStyle='#000';
-      ctx.beginPath();ctx.arc(sx,sy,sr*0.7,0,Math.PI*2);ctx.fill();
-      // Accretion ring
-      ctx.strokeStyle='rgba(255,26,140,0.6)';
-      ctx.lineWidth=2;
-      ctx.beginPath();ctx.ellipse(sx,sy,sr*1.4,sr*0.4,0.3,0,Math.PI*2);ctx.stroke();
+  const sorted=bodies.map((b,i)=>{const p=w2s(b.wx,0,b.wz);return{b,p,i};})
+    .filter(x=>x.p).sort((a,z)=>z.p.depth-a.p.depth);
+  for(const{b,p,i:idx}of sorted){
+    const{sx,sy,s}=p;
+    const sr=Math.max(3,b.r*s*2.5);
+    // Is it a singularity type?
+    const isSing=b.mass>25000;
+    if(isSing){
+      for(let g=5;g>=1;g--){ctx.globalAlpha=0.055*g;ctx.fillStyle='#ff1a8c';ctx.beginPath();ctx.arc(sx,sy,sr+g*13,0,Math.PI*2);ctx.fill();}
+      ctx.globalAlpha=1;ctx.fillStyle='#000';ctx.beginPath();ctx.arc(sx,sy,sr*0.65,0,Math.PI*2);ctx.fill();
+      ctx.strokeStyle='rgba(255,26,140,0.55)';ctx.lineWidth=2;
+      ctx.beginPath();ctx.ellipse(sx,sy,sr*1.5,sr*0.4,0.3,0,Math.PI*2);ctx.stroke();
     } else {
-      // Planet/Star
-      for(let g=5;g>=1;g--){
-        ctx.globalAlpha=0.07*g;
-        ctx.fillStyle=`rgb(${b.cr},${b.cg},${b.cb})`;
-        ctx.beginPath();ctx.arc(sx,sy,sr+g*8,0,Math.PI*2);ctx.fill();
-      }
+      for(let g=5;g>=1;g--){ctx.globalAlpha=0.07*g;ctx.fillStyle=`rgb(${b.cr},${b.cg},${b.cb})`;ctx.beginPath();ctx.arc(sx,sy,sr+g*9,0,Math.PI*2);ctx.fill();}
       ctx.globalAlpha=1;
       const grd=ctx.createRadialGradient(sx-sr*0.3,sy-sr*0.3,0,sx,sy,sr);
       grd.addColorStop(0,`rgb(${Math.min(255,b.cr+80)},${Math.min(255,b.cg+80)},${Math.min(255,b.cb+80)})`);
       grd.addColorStop(1,`rgb(${b.cr},${b.cg},${b.cb})`);
-      ctx.fillStyle=grd;
-      ctx.beginPath();ctx.arc(sx,sy,sr,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle=grd;ctx.beginPath();ctx.arc(sx,sy,sr,0,Math.PI*2);ctx.fill();
     }
-
-    // Selection ring
-    if(idx===selectedBody){
-      ctx.strokeStyle='rgba(255,184,77,0.8)';
-      ctx.lineWidth=2;
-      ctx.setLineDash([4,4]);
-      ctx.beginPath();ctx.arc(sx,sy,sr+8,0,Math.PI*2);ctx.stroke();
-      ctx.setLineDash([]);
+    if(idx===selBody){
+      ctx.strokeStyle='rgba(255,184,77,0.85)';ctx.lineWidth=2;
+      ctx.setLineDash([5,4]);ctx.beginPath();ctx.arc(sx,sy,sr+9,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);
     }
   }
   ctx.globalAlpha=1;
 }
 
-// ═══════════════ DRAW WAVES ═══════════════
 function drawWaves(){
   for(const w of waves){
-    const p=worldToScreen(w.wx,0,w.wz);
-    if(!p) continue;
-    const alpha=w.life*0.35;
-    ctx.strokeStyle=`rgba(0,180,255,${alpha.toFixed(2)})`;
-    ctx.lineWidth=2;
-    // Ellipse to represent 3D ring on the mesh plane
-    const sx=p.sx, sy=p.sy;
-    const rScr=w.r*p.s*camZoom;
-    ctx.beginPath();
-    ctx.ellipse(sx,sy,rScr,rScr*0.4,CAM_RY,0,Math.PI*2);
-    ctx.stroke();
+    const p=w2s(w.wx,0,w.wz);if(!p)continue;
+    ctx.strokeStyle=`rgba(0,190,255,${(w.life*0.3).toFixed(2)})`;ctx.lineWidth=2;
+    ctx.beginPath();ctx.ellipse(p.sx,p.sy,w.r*p.s*camZ,w.r*p.s*camZ*0.38,CRY,0,Math.PI*2);ctx.stroke();
   }
 }
 
-// ═══════════════ DRAW PARTICLES ═══════════════
-function drawParticles(){
+function drawParts(){
   for(const pt of parts){
-    if(pt.trail.length<2) continue;
+    if(pt.trail.length<2)continue;
     for(let i=1;i<pt.trail.length;i++){
-      const p0=worldToScreen(pt.trail[i-1].wx,0,pt.trail[i-1].wz);
-      const p1=worldToScreen(pt.trail[i].wx,0,pt.trail[i].wz);
-      if(!p0||!p1) continue;
-      const a=(i/pt.trail.length)*pt.life*0.8;
-      ctx.strokeStyle=`rgba(200,255,255,${a.toFixed(2)})`;
-      ctx.lineWidth=1.5;
+      const p0=w2s(pt.trail[i-1].wx,0,pt.trail[i-1].wz);
+      const p1=w2s(pt.trail[i].wx,0,pt.trail[i].wz);
+      if(!p0||!p1)continue;
+      const a=(i/pt.trail.length)*pt.life*0.75;
+      ctx.strokeStyle=`rgba(180,255,255,${a.toFixed(2)})`;ctx.lineWidth=1.5;
       ctx.beginPath();ctx.moveTo(p0.sx,p0.sy);ctx.lineTo(p1.sx,p1.sy);ctx.stroke();
     }
-    // Head dot
-    const ph=worldToScreen(pt.wx,0,pt.wz);
-    if(ph){
-      ctx.fillStyle=`rgba(255,255,255,${pt.life.toFixed(2)})`;
-      ctx.beginPath();ctx.arc(ph.sx,ph.sy,3,0,Math.PI*2);ctx.fill();
-    }
+    const ph=w2s(pt.wx,0,pt.wz);
+    if(ph){ctx.fillStyle=`rgba(255,255,255,${pt.life.toFixed(2)})`;ctx.beginPath();ctx.arc(ph.sx,ph.sy,3,0,Math.PI*2);ctx.fill();}
   }
 }
 
-// ═══════════════ DRAW SPAWN ARROW ═══════════════
-function drawSpawnPreview(){
-  if(!spawning||lmbDist<CLICK_THRESH) return;
-  const sw=screenToWorldFlat(lmbPress.x,lmbPress.y);
-  const ew=screenToWorldFlat(lastMX,lastMY);
-  const p0=worldToScreen(sw.wx,0,sw.wz);
-  const p1=worldToScreen(ew.wx,0,ew.wz);
-  if(!p0||!p1) return;
-  ctx.strokeStyle='rgba(255,68,85,0.8)';ctx.lineWidth=2;
+function drawSpawnArrow(){
+  if(!spawning||lmbDist<8)return;
+  const p0=w2s(spawnWX,0,spawnWZ);
+  const p1=w2s(spawnNWX,0,spawnNWZ);
+  if(!p0||!p1)return;
+  ctx.strokeStyle='rgba(255,80,100,0.85)';ctx.lineWidth=2;
   ctx.beginPath();ctx.moveTo(p0.sx,p0.sy);ctx.lineTo(p1.sx,p1.sy);ctx.stroke();
-  ctx.fillStyle='rgba(255,255,255,0.9)';
-  ctx.beginPath();ctx.arc(p0.sx,p0.sy,4,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,0.9)';ctx.beginPath();ctx.arc(p0.sx,p0.sy,5,0,Math.PI*2);ctx.fill();
 }
 
-// ═══════════════ BACKGROUND ═══════════════
-function drawBG(){
-  ctx.fillStyle='#020408';
-  ctx.fillRect(0,0,W,H);
-  // Faint radial center glow
-  const grd=ctx.createRadialGradient(W/2,H*0.42,0,W/2,H*0.42,400);
-  grd.addColorStop(0,'rgba(0,40,120,0.15)');
-  grd.addColorStop(1,'rgba(0,0,0,0)');
-  ctx.fillStyle=grd;ctx.fillRect(0,0,W,H);
-}
-
-// ═══════════════ RESET ═══════════════
+// ── spawn / reset ──
 function resetDemo(){
-  bodies=[];waves=[];parts=[];
-  // Two orbiting stars
-  bodies.push({wx:-120,wz:0,vx:0,vz:95,ax:0,az:0,mass:6000,radius:14,type:1,cr:255,cg:200,cb:60});
-  bodies.push({wx:120,wz:0,vx:0,vz:-95,ax:0,az:0,mass:6000,radius:14,type:1,cr:255,cg:160,cb:80});
-  // Planet
-  bodies.push({wx:0,wz:220,vx:-75,vz:0,ax:0,az:0,mass:800,radius:8,type:0,cr:80,cg:160,cb:255});
+  bodies=[];waves=[];parts=[];selBody=-1;
+  bodies.push({wx:-115,wz:0,vx:0,vz:92,ax:0,az:0,mass:5800,r:14,cr:255,cg:200,cb:60});
+  bodies.push({wx:115,wz:0,vx:0,vz:-92,ax:0,az:0,mass:5800,r:14,cr:255,cg:160,cb:80});
+  bodies.push({wx:0,wz:210,vx:-72,vz:0,ax:0,az:0,mass:750,r:8,cr:80,cg:160,cb:255});
 }
 
 function spawnBody(mode,wx,wz,vx,vz){
-  if(bodies.length>=MAX_BODIES) return;
-  const cfg=SPAWN_CFG[mode];
-  bodies.push({wx,wz,vx,vz,ax:0,az:0,
-    mass:cfg.mass*(0.6+Math.random()*0.8),
-    radius:cfg.radius,type:mode,
-    cr:cfg.cr,cg:cfg.cg,cb:cfg.cb});
+  if(bodies.length>=MAX_B)return;
+  const c=SPAWN_CFG[mode];
+  const mass=c.mass*(0.65+Math.random()*0.7);
+  bodies.push({wx,wz,vx,vz,ax:0,az:0,mass,r:c.r,cr:c.cr,cg:c.cg,cb:c.cb});
+  addWave(wx,wz,0.4);
 }
 
-// ═══════════════ HUD UPDATE ═══════════════
-function updateHUD(dt){
+function shootPart(){
+  const wp=s2w(mx,my);
+  const cp=s2w(SW/2,SH*0.42);
+  const dx=cp.wx-wp.wx,dz=cp.wz-wp.wz,d=Math.sqrt(dx*dx+dz*dz)+1;
+  addPart(wp.wx,wp.wz,dx/d*350,dz/d*350);
+}
+
+// ── spawn type ──
+function setSpawn(n){
+  spawnMode=n;
+  document.querySelectorAll('.tbtn').forEach((b,i)=>{b.classList.toggle('on',i===n);});
+}
+
+// ── context menu ──
+function buildCtxMenu(){
+  const cm=document.getElementById('ctxmenu');
+  cm.innerHTML='<div class="cxtit">SPAWN HERE</div>';
+  const cols=['#64b4ff','#ffdc50','#ff1a8c'];
+  SPAWN_CFG.forEach((c,i)=>{
+    const el=document.createElement('div');el.className='cxitem';
+    el.innerHTML=`<div class="cxdot" style="background:${cols[i]}"></div>${c.name}`;
+    el.addEventListener('mousedown',e=>{e.stopPropagation();spawnMode=i;setSpawn(i);spawnBody(i,ctxWX,ctxWZ,0,0);closeCtx();});
+    cm.appendChild(el);
+  });
+}
+function openCtx(screenX,screenY,wx,wz){
+  ctxOpen=true;ctxWX=wx;ctxWZ=wz;
+  ctxScreenX=screenX;ctxScreenY=screenY;
+  const cm=document.getElementById('ctxmenu');
+  let px=screenX,py=screenY+NAV;
+  if(px+160>window.innerWidth)px=window.innerWidth-165;
+  if(py+140>window.innerHeight)py=window.innerHeight-145;
+  cm.style.left=px+'px';cm.style.top=py+'px';cm.style.display='block';
+}
+function closeCtx(){ctxOpen=false;document.getElementById('ctxmenu').style.display='none';}
+
+// ── HUD ──
+function updateHUD(){
   const fps=fpsSmooth+0.5|0;
   const fe=document.getElementById('fps');
   fe.textContent=fps+' FPS';
   fe.style.color=fps>=55?'#3affa0':fps>=30?'#ffb84d':'#ff5566';
-
-  let np=0,nw=waves.length,nr=parts.length;
-  for(const b of bodies) if(b.mass>0) np++;
-  document.getElementById('status').textContent=
-    `Bodies: ${np} · Zoom: ${camZoom.toFixed(2)}x · Waves: ${showWaves?'ON':'OFF'}`;
-  document.getElementById('i-waves').textContent=nw;
-  document.getElementById('i-parts').textContent=nr;
-  document.getElementById('paused').style.display=paused?'block':'none';
-  document.querySelectorAll('.tb-btn').forEach((b,i)=>b.classList.toggle('sel',i===spawnMode));
+  document.getElementById('statbar').textContent=`Bodies: ${bodies.length} · Zoom: ${camZ.toFixed(2)}× · Waves: ${showW?'ON':'OFF'}`;
+  document.getElementById('iwaves').textContent=waves.length;
+  document.getElementById('iparts').textContent=parts.length;
+  document.getElementById('paused-banner').style.display=paused?'block':'none';
 }
 
-// ═══════════════ RENDER LOOP ═══════════════
+// ── RENDER LOOP ──
 function frame(now){
-  const dt=Math.min((now-lastT)/1000,0.05); lastT=now;
-  const iFPS=dt>0?1/dt:60; fpsSmooth+=(iFPS-fpsSmooth)*(dt/0.5);
-  flashAmt=Math.max(0,flashAmt-dt*1.5);
-
-  if(!paused){
-    physicsStep(dt);
-    updateGrid();
+  if(document.getElementById('psim').classList.contains('on')){
+    const dt=Math.min((now-lastT)/1000,0.05);lastT=now;
+    const iFPS=dt>0?1/dt:60;fpsSmooth+=(iFPS-fpsSmooth)*(dt/0.5);
+    flashAmt=Math.max(0,flashAmt-dt*1.6);
+    if(!paused){physStep(dt);updateGrid();}
+    projectGrid();
+    // Clear
+    ctx.fillStyle='#020408';ctx.fillRect(0,0,SW,SH);
+    // Ambient glow
+    const grd=ctx.createRadialGradient(SW/2,SH*0.42,0,SW/2,SH*0.42,380);
+    grd.addColorStop(0,'rgba(0,40,110,0.14)');grd.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=grd;ctx.fillRect(0,0,SW,SH);
+    // Flash
+    if(flashAmt>0){ctx.fillStyle=`rgba(180,100,255,${(flashAmt*0.28).toFixed(2)})`;ctx.fillRect(0,0,SW,SH);}
+    drawGrid();
+    if(showW)drawWaves();
+    drawBodies();
+    drawParts();
+    drawSpawnArrow();
+    updateHUD();
+  } else {
+    lastT=now;
   }
-  projectGrid();
-
-  drawBG();
-
-  // Flash
-  if(flashAmt>0){
-    ctx.fillStyle=`rgba(200,160,255,${(flashAmt*0.3).toFixed(2)})`;
-    ctx.fillRect(0,0,W,H);
-  }
-
-  drawGrid();
-  if(showWaves) drawWaves();
-  drawBodies();
-  drawParticles();
-  drawSpawnPreview();
-
-  updateHUD(dt);
   requestAnimationFrame(frame);
 }
 
-// ═══════════════ INPUT ═══════════════
-const keys={};
-window.addEventListener('keydown',e=>{
-  keys[e.key.toLowerCase()]=true;
-  const k=e.key.toLowerCase();
-  if(k===' '){paused=!paused;e.preventDefault();}
-  else if(k==='c'){bodies=[];waves=[];parts=[];}
-  else if(k==='r') resetDemo();
-  else if(k==='w') showWaves=!showWaves;
-  else if(k==='g'){gridDetail=gridDetail===1?2:gridDetail===2?3:1;document.getElementById('i-grid').textContent=`${GRID_N/gridDetail|0} × ${GRID_N/gridDetail|0}`;}
-  else if(k==='t') shootParticle();
-  else if(k==='1') spawnMode=0;
-  else if(k==='2') spawnMode=1;
-  else if(k==='3') spawnMode=2;
-});
-window.addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=false;});
+// ══════════════════════════════════════════════
+//  INPUT — ALL MOUSE COORDS RELATIVE TO CANVAS
+// ══════════════════════════════════════════════
 
-function shootParticle(){
-  // Shoot from cursor position with velocity toward screen center
-  const wp=screenToWorldFlat(lastMX,lastMY);
-  const cx2=screenToWorldFlat(W/2,H/2);
-  const dx=cx2.wx-wp.wx, dz=cx2.wz-wp.wz;
-  const d=Math.sqrt(dx*dx+dz*dz)+1;
-  const spd=350;
-  parts.push({wx:wp.wx,wz:wp.wz,vx:dx/d*spd,vz:dz/d*spd,trail:[],life:1});
-  if(parts.length>MAX_PARTS) parts.shift();
+function getCanvasXY(e){
+  // Canvas is positioned at (0, NAV) in the page
+  return{x:e.clientX, y:e.clientY-NAV};
 }
 
-canvas.addEventListener('mousemove',e=>{
-  lastMX=e.clientX; lastMY=e.clientY;
+simcanvas.addEventListener('mousemove',e=>{
+  const pos=getCanvasXY(e);
+  mx=pos.x; my=pos.y;
+
   if(rmbDown){
-    // Pan: invert the screen→world transform approximately
-    const dsx=e.movementX, dsy=e.movementY;
-    // Pan in the flat grid plane
-    camOffX -= dsx/(camZoom*CRY_COS*FOCAL/680)*1.8;
-    camOffY -= (dsy/(camZoom*CRX_SIN*FOCAL/680))*1.2;
+    // Pan: translate world coordinates opposite to drag
+    const prev=s2w(mx-e.movementX, my-e.movementY);
+    const curr=s2w(mx,my);
+    camX-=(curr.wx-prev.wx);
+    camY-=(curr.wz-prev.wz);
+    rmbDragDist+=Math.abs(e.movementX)+Math.abs(e.movementY);
   }
-  if(lmbDown){
-    const ds=Math.hypot(e.clientX-lmbPress.x,e.clientY-lmbPress.y);
-    lmbDist=ds;
-    spawnNow=screenToWorldFlat(e.clientX,e.clientY);
+
+  if(lmbDown&&spawning){
+    lmbDist=Math.hypot(mx-lmbPressX,my-lmbPressY);
+    const wp=s2w(mx,my);
+    spawnNWX=wp.wx;spawnNWZ=wp.wz;
   }
 });
 
-canvas.addEventListener('mousedown',e=>{
+simcanvas.addEventListener('mousedown',e=>{
+  // Don't handle clicks that land on toolbar area
+  const pos=getCanvasXY(e);
+  if(pos.x>SW-TBW)return;
+
   if(e.button===0){
-    if(e.clientX>W-130) return;
-    lmbPress={x:e.clientX,y:e.clientY};
-    lmbDist=0; lmbDown=true;
-    spawning=true;
-    spawnStart=screenToWorldFlat(e.clientX,e.clientY);
-    spawnNow={...spawnStart};
+    // Close context menu if open
+    if(ctxOpen){closeCtx();return;}
+    lmbPressX=pos.x;lmbPressY=pos.y;
+    lmbDist=0;lmbDown=true;spawning=true;
+    const wp=s2w(pos.x,pos.y);
+    spawnWX=wp.wx;spawnWZ=wp.wz;
+    spawnNWX=wp.wx;spawnNWZ=wp.wz;
   }
-  if(e.button===2){rmbDown=true;rmbLast={x:e.clientX,y:e.clientY};}
+  if(e.button===2){
+    rmbPressX=pos.x;rmbPressY=pos.y;
+    rmbDragDist=0;rmbDown=true;
+    if(ctxOpen)closeCtx();
+  }
 });
 
-canvas.addEventListener('mouseup',e=>{
-  if(e.button===0&&spawning){
-    spawning=false; lmbDown=false;
-    if(lmbDist<CLICK_THRESH){
-      // Try select body
-      const wp=screenToWorldFlat(lmbPress.x,lmbPress.y);
+simcanvas.addEventListener('mouseup',e=>{
+  const pos=getCanvasXY(e);
+
+  if(e.button===0&&lmbDown){
+    lmbDown=false;spawning=false;
+
+    if(lmbDist<8){
+      // Click — try to select a body
+      const wp=s2w(lmbPressX,lmbPressY);
       let best=-1,bd=1e18;
       for(let i=0;i<bodies.length;i++){
-        const d2=(bodies[i].wx-wp.wx)**2+(bodies[i].wz-wp.wz)**2;
-        if(d2<(bodies[i].radius*3)**2&&d2<bd){bd=d2;best=i;}
+        const dx=bodies[i].wx-wp.wx,dz=bodies[i].wz-wp.wz;
+        const d2=dx*dx+dz*dz;
+        const hitR=(bodies[i].r+14/camZ)**2;
+        if(d2<hitR&&d2<bd){bd=d2;best=i;}
       }
-      selectedBody=best;
+      selBody=best;
     } else {
-      const vscale=1.8;
-      const vx=(spawnStart.wx-spawnNow.wx)*vscale;
-      const vz=(spawnStart.wz-spawnNow.wz)*vscale;
-      spawnBody(spawnMode,spawnStart.wx,spawnStart.wz,vx,vz);
-      addWave(spawnStart.wx,spawnStart.wz,0.4);
+      // Drag — spawn body with velocity
+      const vx=(spawnWX-spawnNWX)*1.9;
+      const vz=(spawnWZ-spawnNWZ)*1.9;
+      spawnBody(spawnMode,spawnWX,spawnWZ,vx,vz);
     }
   }
-  if(e.button===2) rmbDown=false;
+
+  if(e.button===2&&rmbDown){
+    rmbDown=false;
+    if(rmbDragDist<8&&pos.x<SW-TBW&&!ctxOpen){
+      // RMB click — open context menu
+      const wp=s2w(pos.x,pos.y);
+      openCtx(pos.x,pos.y,wp.wx,wp.wz);
+    }
+  }
 });
 
-canvas.addEventListener('wheel',e=>{
+simcanvas.addEventListener('wheel',e=>{
   e.preventDefault();
+  const pos=getCanvasXY(e);
+  const mw=s2w(pos.x,pos.y);
   const delta=e.deltaY<0?1:-1;
-  camZoom=Math.max(0.2,Math.min(5,camZoom+delta*0.12*camZoom));
+  const zd=delta*0.12*camZ;
+  camZ=Math.max(0.15,Math.min(6,camZ+zd));
+  // Shift camera so world point under cursor stays fixed
+  const mwAfter=s2w(pos.x,pos.y);
+  camX+=(mw.wx-mwAfter.wx);
+  camY+=(mw.wz-mwAfter.wz);
 },{passive:false});
 
-canvas.addEventListener('contextmenu',e=>e.preventDefault());
+simcanvas.addEventListener('contextmenu',e=>e.preventDefault());
 
-document.querySelectorAll('.tb-btn').forEach((btn,i)=>{
-  btn.addEventListener('click',()=>{spawnMode=i;});
+// Close context menu on click outside it
+window.addEventListener('mousedown',e=>{
+  if(ctxOpen){
+    const cm=document.getElementById('ctxmenu');
+    if(!cm.contains(e.target))closeCtx();
+  }
 });
 
-// ═══════════════ INIT ═══════════════
+// Keyboard
+const keys={};
+window.addEventListener('keydown',e=>{
+  const k=e.key.toLowerCase();
+  if(k===' '){paused=!paused;e.preventDefault();}
+  else if(k==='c'){bodies=[];waves=[];parts=[];selBody=-1;}
+  else if(k==='r')resetDemo();
+  else if(k==='w')showW=!showW;
+  else if(k==='g'){
+    gdetail=gdetail===1?2:gdetail===2?3:1;
+    document.getElementById('igrid').textContent=`${Math.ceil(GN/gdetail)}×${Math.ceil(GN/gdetail)}`;
+  }
+  else if(k==='t')shootPart();
+  else if(k==='1')setSpawn(0);
+  else if(k==='2')setSpawn(1);
+  else if(k==='3')setSpawn(2);
+});
+
+// ── INIT ──
+buildCtxMenu();
 resetDemo();
 updateGrid();
 requestAnimationFrame(frame);
